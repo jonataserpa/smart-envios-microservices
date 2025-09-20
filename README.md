@@ -171,6 +171,173 @@ C4Component
     Rel(carriersapi, carriers, "Request", "HTTPS/REST")
 ```
 
+### **C4 - Diagrama de Código - Use Case de Rastreamento**
+*Implementação detalhada em nível de código*
+
+```mermaid
+classDiagram
+    class TrackingController {
+        +addTrackingCode(request: AddTrackingRequest): Promise~TrackingResponse~
+        +getTracking(code: string): Promise~TrackingResponse~
+        +refreshTracking(code: string): Promise~TrackingResponse~
+        +listTracking(query: ListTrackingQuery): Promise~TrackingListResponse~
+        -validateRequest(request: any): ValidationResult
+        -handleError(error: Error): ErrorResponse
+    }
+    
+    class UpdateTrackingUseCase {
+        -trackingRepository: TrackingRepository
+        -carriersClient: CarriersTrackingClient
+        -eventPublisher: EventPublisher
+        -cacheService: TrackingCacheService
+        +execute(trackingCode: string): Promise~TrackingEvent[]~
+        -processNewEvents(tracking: TrackingCode, events: TrackingEvent[]): Promise~TrackingEvent[]~
+        -updateTrackingStatus(tracking: TrackingCode, events: TrackingEvent[]): Promise~void~
+        -calculateNextCheck(tracking: TrackingCode, error?: Error): Date
+    }
+    
+    class TrackingCode {
+        +id: string
+        +code: string
+        +carrier: string
+        +status: TrackingStatus
+        +lastCheckedAt: Date
+        +nextCheckAt: Date
+        +isActive: boolean
+        +create(data: CreateTrackingData): TrackingCode
+        +markAsDelivered(): void
+        +updateNextCheck(interval: number): void
+        +isExpired(): boolean
+    }
+    
+    class TrackingEvent {
+        +id: string
+        +trackingCodeId: string
+        +timestamp: Date
+        +status: string
+        +location: string
+        +description: string
+        +isDelivered: boolean
+        +isException: boolean
+        +create(data: EventData): TrackingEvent
+    }
+    
+    class CarriersTrackingClient {
+        -baseUrl: string
+        -token: string
+        -httpClient: AxiosInstance
+        +trackShipment(trackingCode: string): Promise~CarriersTrackingResponse~
+        +healthCheck(): Promise~HealthStatus~
+        -buildRequest(code: string): AxiosRequestConfig
+        -handleApiError(error: AxiosError): CarriersApiError
+    }
+    
+    class TrackingRepository {
+        <<interface>>
+        +findByCode(code: string): Promise~TrackingCode | null~
+        +save(tracking: TrackingCode): Promise~TrackingCode~
+        +findPendingCodes(): Promise~TrackingCode[]~
+        +findByCustomer(customerId: string): Promise~TrackingCode[]~
+    }
+    
+    class MongoTrackingRepository {
+        -model: TrackingCodeModel
+        +findByCode(code: string): Promise~TrackingCode | null~
+        +save(tracking: TrackingCode): Promise~TrackingCode~
+        +findPendingCodes(): Promise~TrackingCode[]~
+        +findByCustomer(customerId: string): Promise~TrackingCode[]~
+        -mapToDomain(doc: Document): TrackingCode
+        -mapToDocument(entity: TrackingCode): Document
+    }
+    
+    class KafkaEventPublisher {
+        -producer: Producer
+        -logger: Logger
+        +publish(eventType: string, data: any): Promise~void~
+        -getTopicForEvent(eventType: string): string
+        -createEvent(type: string, data: any): DomainEvent
+    }
+    
+    class TrackingScheduler {
+        -trackingService: TrackingService
+        -isRunning: boolean
+        +start(): void
+        +stop(): void
+        -processPendingTrackingCodes(): Promise~void~
+        -processTrackingCode(code: TrackingCode): Promise~void~
+        -cleanupOldEvents(): Promise~void~
+    }
+
+    TrackingController --> UpdateTrackingUseCase
+    UpdateTrackingUseCase --> TrackingRepository
+    UpdateTrackingUseCase --> CarriersTrackingClient
+    UpdateTrackingUseCase --> KafkaEventPublisher
+    UpdateTrackingUseCase --> TrackingCode
+    UpdateTrackingUseCase --> TrackingEvent
+    TrackingRepository <|-- MongoTrackingRepository
+    TrackingScheduler --> UpdateTrackingUseCase
+    MongoTrackingRepository --> TrackingCode
+    KafkaEventPublisher --> TrackingEvent
+```
+
+### **C4 - Diagrama de Código - Sequência de Atualização**
+*Fluxo detalhado de atualização de rastreamento*
+
+```mermaid
+sequenceDiagram
+    participant C as TrackingController
+    participant U as UpdateTrackingUseCase  
+    participant R as TrackingRepository
+    participant CC as CarriersClient
+    participant K as KafkaPublisher
+    participant DB as MongoDB
+    participant API as Carriers API
+
+    C->>U: execute(trackingCode)
+    
+    U->>R: findByCode(trackingCode)
+    R->>DB: query tracking
+    DB-->>R: tracking document
+    R-->>U: TrackingCode entity
+    
+    alt tracking not found
+        U-->>C: throw TrackingNotFoundError
+    end
+    
+    U->>CC: trackShipment(trackingCode)
+    CC->>API: GET /Tracking/{code}
+    API-->>CC: tracking response
+    CC-->>U: CarriersTrackingResponse
+    
+    U->>U: processNewEvents(tracking, newEvents)
+    
+    loop for each new event
+        U->>U: create TrackingEvent
+        U->>R: saveEvent(event)
+        R->>DB: insert event
+        
+        U->>K: publish('tracking.event.new', eventData)
+        K->>K: createEvent(type, data)
+        Note over K: Publish to Kafka topic
+    end
+    
+    U->>U: updateTrackingStatus(tracking, allEvents)
+    U->>U: calculateNextCheck(tracking)
+    U->>R: save(tracking)
+    R->>DB: update tracking
+    
+    alt status changed
+        U->>K: publish('tracking.status.changed', statusData)
+    end
+    
+    alt delivered
+        U->>K: publish('tracking.delivered', deliveryData)
+    end
+    
+    U-->>C: updated events[]
+    C-->>C: return TrackingResponse
+```
+
 ### **Fluxo de Dados - Event-Driven Architecture**
 *Como os eventos fluem pelo sistema*
 
