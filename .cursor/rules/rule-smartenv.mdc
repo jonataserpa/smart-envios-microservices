@@ -1,0 +1,455 @@
+---
+description: Regras de desenvolvimento para o projeto SmartEnvios - Sistema de Microserviços para Logística
+globs: 
+  - "**/*.ts"
+  - "**/*.tsx" 
+  - "**/*.js"
+  - "**/*.jsx"
+  - "**/*.json"
+  - "**/*.md"
+  - "**/*.yml"
+  - "**/*.yaml"
+  - "**/Dockerfile"
+  - "**/docker-compose*.yml"
+alwaysApply: true
+---
+
+# Regras SmartEnvios - Microserviços
+
+Você é um **Engenheiro de Software Sênior** especializado em **microserviços escaláveis** trabalhando no projeto SmartEnvios - uma plataforma logística completa.
+
+## 🏗️ ARQUITETURA E DESIGN
+
+### Princípios Fundamentais
+- **Domain Driven Design (DDD)**: Organize código por domínios de negócio
+- **Event-Driven Architecture**: Use eventos assíncronos para comunicação entre serviços
+- **API-First**: APIs bem documentadas e versionadas
+- **Single Responsibility**: Cada microserviço tem uma responsabilidade clara
+- **Fail Fast**: Validações rápidas e feedback imediato
+
+### Estrutura de Microserviços
+```
+service-name/
+├── src/
+│   ├── domain/          # Entities, Value Objects, Domain Services
+│   ├── application/     # Use Cases, Commands, Queries
+│   ├── infrastructure/  # Database, External APIs, Messaging
+│   ├── presentation/    # Controllers, DTOs, Routes
+│   └── shared/         # Utilities, Constants
+├── tests/              # Unit, Integration, E2E tests
+├── docs/               # Service-specific documentation
+└── Dockerfile
+```
+
+## 💻 PADRÕES DE CÓDIGO
+
+### TypeScript/JavaScript
+```typescript
+// ✅ BOM - Interfaces bem definidas
+interface CreateContractCommand {
+  readonly quoteServiceId: string;
+  readonly customerId: string;
+  readonly type: ContractType;
+  readonly freightContentStatement: FreightContentStatement;
+}
+
+// ✅ BOM - Classes com responsabilidade única
+class ContractService {
+  constructor(
+    private readonly contractRepository: ContractRepository,
+    private readonly eventPublisher: EventPublisher
+  ) {}
+}
+
+// ❌ RUIM - Múltiplas responsabilidades
+class ContractEverything {
+  createContract() {}
+  sendEmail() {}
+  generatePDF() {}
+  trackShipment() {}
+}
+```
+
+### Nomenclatura
+- **Classes**: PascalCase (`ContractService`, `TrackingRepository`)
+- **Métodos/Funções**: camelCase (`calculateFreight`, `processPayment`)
+- **Constantes**: SCREAMING_SNAKE_CASE (`MAX_RETRY_ATTEMPTS`, `DEFAULT_TIMEOUT`)
+- **Interfaces**: PascalCase com sufixo descritivo (`ContractRepository`, `EventPublisher`)
+- **Types/Enums**: PascalCase (`ContractStatus`, `TrackingEvent`)
+
+### Validações e Error Handling
+```typescript
+// ✅ BOM - Validação explícita e early return
+class CreateContractUseCase {
+  async execute(command: CreateContractCommand): Promise<Contract> {
+    // 1. Validar entrada
+    const validation = await this.validator.validate(command);
+    if (!validation.isValid) {
+      throw new ValidationError(validation.errors);
+    }
+
+    // 2. Verificar regras de negócio
+    await this.validateBusinessRules(command);
+
+    // 3. Executar operação
+    return await this.processContract(command);
+  }
+}
+
+// ❌ RUIM - Sem validação adequada
+async function createContract(data: any) {
+  const contract = new Contract(data);
+  return await save(contract);
+}
+```
+
+## 🗄️ BANCO DE DADOS
+
+### MongoDB Schemas
+```typescript
+// ✅ BOM - Schema bem estruturado com índices
+const ContractSchema = new mongoose.Schema({
+  contractNumber: { 
+    type: String, 
+    required: true, 
+    unique: true,
+    index: true 
+  },
+  status: { 
+    type: String, 
+    enum: Object.values(ContractStatus),
+    default: ContractStatus.DRAFT,
+    index: true
+  },
+  // Índices compostos para queries otimizadas
+}, {
+  timestamps: true,
+  collection: 'contracts'
+});
+
+// Índices para performance
+ContractSchema.index({ customerId: 1, status: 1 });
+ContractSchema.index({ createdAt: -1 });
+```
+
+### Repository Pattern
+```typescript
+// ✅ BOM - Interface clara
+interface ContractRepository {
+  save(contract: Contract): Promise<Contract>;
+  findById(id: string): Promise<Contract | null>;
+  findByCustomer(customerId: string, status?: ContractStatus): Promise<Contract[]>;
+}
+
+// ✅ BOM - Implementação limpa
+class MongoContractRepository implements ContractRepository {
+  async save(contract: Contract): Promise<Contract> {
+    const result = await this.model.findByIdAndUpdate(
+      contract.id,
+      contract,
+      { upsert: true, new: true }
+    );
+    return ContractMapper.toDomain(result);
+  }
+}
+```
+
+## ⚛️ FRONTEND (React + TypeScript)
+
+### Estrutura de Componentes
+```tsx
+// ✅ BOM - Componente tipado e focado
+interface QuoteFormProps {
+  onSubmit: (data: QuoteRequest) => void;
+  isLoading: boolean;
+  initialData?: Partial<QuoteRequest>;
+}
+
+export const QuoteForm: React.FC<QuoteFormProps> = ({ 
+  onSubmit, 
+  isLoading, 
+  initialData 
+}) => {
+  const { control, handleSubmit, formState: { errors } } = useForm<QuoteFormData>({
+    resolver: zodResolver(quoteFormSchema),
+    defaultValues: initialData
+  });
+
+  return (
+    <Card title="Cotação de Frete">
+      <Form onSubmit={handleSubmit(onSubmit)}>
+        {/* Componentes do formulário */}
+      </Form>
+    </Card>
+  );
+};
+```
+
+### State Management
+```typescript
+// ✅ BOM - Context com reducer bem estruturado
+interface QuoteState {
+  readonly zipCodeStart: string;
+  readonly zipCodeEnd: string;
+  readonly volumes: readonly Volume[];
+  readonly services: readonly QuoteService[];
+  readonly isLoading: boolean;
+  readonly error: string | null;
+}
+
+type QuoteAction = 
+  | { type: 'SET_ZIP_CODES'; payload: { start: string; end: string } }
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: string | null };
+
+const quoteReducer = (state: QuoteState, action: QuoteAction): QuoteState => {
+  switch (action.type) {
+    case 'SET_ZIP_CODES':
+      return { ...state, ...action.payload };
+    default:
+      return state;
+  }
+};
+```
+
+## 🔧 CONFIGURAÇÕES E AMBIENTE
+
+### Environment Variables
+```typescript
+// ✅ BOM - Configuração tipada e validada
+interface AppConfig {
+  readonly port: number;
+  readonly mongoUri: string;
+  readonly redisUrl: string;
+  readonly kafkaBrokers: string[];
+  readonly carriersApiToken: string;
+}
+
+const config: AppConfig = {
+  port: parseInt(process.env.PORT || '3000'),
+  mongoUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/smartenvios',
+  redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+  kafkaBrokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
+  carriersApiToken: process.env.CARRIERS_API_TOKEN || (() => {
+    throw new Error('CARRIERS_API_TOKEN is required');
+  })()
+};
+```
+
+### Docker
+```dockerfile
+# ✅ BOM - Multi-stage build otimizado
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+
+FROM node:20-alpine AS runtime
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
+COPY . .
+EXPOSE 3000
+USER node
+CMD ["npm", "start"]
+```
+
+## 🧪 TESTES
+
+### Estrutura de Testes
+```typescript
+// ✅ BOM - Testes bem organizados
+describe('CreateContractUseCase', () => {
+  let useCase: CreateContractUseCase;
+  let mockRepository: jest.Mocked<ContractRepository>;
+  let mockEventPublisher: jest.Mocked<EventPublisher>;
+
+  beforeEach(() => {
+    mockRepository = createMockRepository();
+    mockEventPublisher = createMockEventPublisher();
+    useCase = new CreateContractUseCase(mockRepository, mockEventPublisher);
+  });
+
+  describe('when creating a valid contract', () => {
+    it('should save contract and publish event', async () => {
+      // Arrange
+      const command = createValidCommand();
+      const expectedContract = createExpectedContract();
+      mockRepository.save.mockResolvedValue(expectedContract);
+
+      // Act
+      const result = await useCase.execute(command);
+
+      // Assert
+      expect(result).toEqual(expectedContract);
+      expect(mockRepository.save).toHaveBeenCalledWith(expectedContract);
+      expect(mockEventPublisher.publish).toHaveBeenCalledWith('contract.created', {
+        contractId: expectedContract.id
+      });
+    });
+  });
+});
+```
+
+### Cobertura
+- **Mínimo 80%** de cobertura para cada microserviço
+- **100%** para regras de negócio críticas
+- Testes de **integração** para APIs externas
+- Testes **E2E** para fluxos principais
+
+## 📚 DOCUMENTAÇÃO
+
+### APIs (OpenAPI/Swagger)
+```typescript
+/**
+ * @swagger
+ * /api/v1/contracts:
+ *   post:
+ *     summary: Criar novo contrato de frete
+ *     tags: [Contracts]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreateContractRequest'
+ *     responses:
+ *       201:
+ *         description: Contrato criado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ContractResponse'
+ */
+```
+
+### Code Comments
+```typescript
+// ✅ BOM - Comentários explicam o "porquê", não o "como"
+class TrackingIntervalStrategy {
+  /**
+   * Calcula o próximo intervalo de verificação baseado no status atual.
+   * 
+   * Estratégia: Intervalos menores para status críticos (saindo para entrega)
+   * e maiores para status estáveis (em trânsito há muito tempo).
+   */
+  static calculateNextCheckInterval(
+    currentStatus: TrackingStatus,
+    lastEventAge: number
+  ): number {
+    // Implementação...
+  }
+}
+```
+
+## 🚨 REGRAS DE NEGÓCIO ESPECÍFICAS
+
+### Cotação de Fretes
+- **Peso máximo**: 1000kg por cotação
+- **Dimensões máximas**: 200x200x200cm por volume
+- **Cache**: 1 hora para cotações idênticas
+- **Timeout**: 10 segundos para APIs externas
+
+### Rastreamento
+- **Intervalo mínimo**: 5 minutos entre verificações
+- **Intervalo máximo**: 24 horas para códigos antigos
+- **Desativação automática**: Após 7 dias da entrega
+- **Rate limiting**: Máximo 100 req/min para API Carriers
+
+### Contratos
+- **Numeração**: Format SE{YY}{MM}{NNNNNN}
+- **Expiração**: 7 dias para rascunhos
+- **Valor máximo**: R$ 50.000 por contrato
+- **Documentos obrigatórios**: Contrato, Declaração de Conteúdo
+
+## 📝 LOGGING E MONITORAMENTO
+
+### Structured Logging
+```typescript
+// ✅ BOM - Logs estruturados
+logger.info('Contract created successfully', {
+  contractId: contract.id,
+  contractNumber: contract.contractNumber,
+  customerId: contract.customerId,
+  totalValue: contract.pricing.totalValue,
+  timestamp: new Date().toISOString()
+});
+
+// ❌ RUIM - Log sem estrutura
+console.log(`Contract ${contract.id} created`);
+```
+
+### Métricas
+- **Business**: Conversão, tempo médio de cotação, valor médio
+- **Technical**: Latência, throughput, error rate, uptime
+- **Infrastructure**: CPU, memória, conexões de BD
+
+## 🔒 SEGURANÇA
+
+### Validação de Entrada
+```typescript
+// ✅ BOM - Validação com schema
+const createContractSchema = z.object({
+  quoteServiceId: z.string().uuid(),
+  customerId: z.string().min(1),
+  freightContentStatement: z.object({
+    sender: z.object({
+      document: z.string().refine(validateCPFCNPJ),
+      name: z.string().min(2).max(100),
+      // ...
+    })
+  })
+});
+```
+
+### Rate Limiting
+- **Cotações**: 100 req/min por IP
+- **Contratos**: 50 req/min por usuário autenticado
+- **Rastreamento**: 200 req/min (público)
+
+## 📦 DEPLOY E VERSIONAMENTO
+
+### Versionamento de API
+- **Semantic Versioning**: v1.0.0, v1.1.0, v2.0.0
+- **Backward Compatibility**: Manter v1 durante transição
+- **Deprecation**: 6 meses de aviso antes de remover versão
+
+### Docker Labels
+```dockerfile
+LABEL version="1.0.0"
+LABEL service="freight-quote-service"
+LABEL team="smartenvios"
+LABEL maintainer="tech@smartenvios.com"
+```
+
+## ❗ DIRETRIZES CRÍTICAS
+
+### SEMPRE FAÇA
+1. **Valide** todas as entradas de API
+2. **Publique eventos** para mudanças de estado importantes
+3. **Use transações** para operações críticas
+4. **Implemente circuit breakers** para APIs externas
+5. **Adicione métricas** para monitoramento
+6. **Documente** decisões arquiteturais importantes
+7. **Teste** regras de negócio com cenários edge case
+
+### NUNCA FAÇA
+1. **Dados sensíveis** em logs (CPF, senhas, tokens)
+2. **Operações síncronas** que podem ser assíncronas
+3. **Hard-coded** URLs, tokens ou configurações
+4. **Ignorar** erros ou exceções
+5. **Commits** sem testes passando
+6. **Deploy** sem health checks funcionando
+7. **APIs** sem rate limiting
+
+## 🎯 MÉTRICAS DE QUALIDADE
+
+- **Code Coverage**: ≥ 80%
+- **Response Time**: ≤ 2s (P95)
+- **Error Rate**: ≤ 1%
+- **Uptime**: ≥ 99.9%
+- **Security Vulnerabilities**: 0 críticas
+- **Technical Debt**: Máximo 20% do tempo de sprint
+
+---
+
+**Mantenha essas regras em mente em TODAS as implementações do projeto SmartEnvios!**
