@@ -41,24 +41,24 @@ O SmartEnvios é uma plataforma completa de microserviços para automação de p
 ```mermaid
 gantt
     title Cronograma SmartEnvios
-    dateFormat X
-    axisFormat %s
+    dateFormat YYYY-MM-DD
+    axisFormat %m/%d
     
     section Infraestrutura
-    Setup Base :done, infra, 0, 7d
+    Setup Base :done, infra, 2025-01-20, 7d
     
     section Backend
-    Cotação :active, quote, 7d, 15d
-    Rastreamento :tracking, 7d, 16d
-    Contratação :contract, 21d, 31d
+    Cotação :active, quote, 2025-01-27, 8d
+    Rastreamento :tracking, 2025-01-27, 9d
+    Contratação :contract, 2025-02-10, 10d
     
     section Frontend
-    Tela Cotação :frontend1, 14d, 20d
-    Tela Contratação :frontend2, 28d, 35d
+    Tela Cotação :frontend1, 2025-02-03, 6d
+    Tela Contratação :frontend2, 2025-02-17, 7d
     
     section Integração
-    API Gateway :gateway, 35d, 45d
-    Testes E2E :testing, 40d, 45d
+    API Gateway :gateway, 2025-02-24, 10d
+    Testes E2E :testing, 2025-03-01, 5d
 ```
 
 ### **Fases de Desenvolvimento**
@@ -490,5 +490,5 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 
 ---
 
-**Criado com ❤️ pela equipe SmartEnvios**  
+**Criado por Jonata Serpa**  
 **Última atualização**: Janeiro 2025
