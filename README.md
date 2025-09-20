@@ -378,6 +378,220 @@ flowchart TD
     style V fill:#c8e6c9
 ```
 
+## 📚 Entendendo a Arquitetura C4 - Guia Passo a Passo
+
+### 🎯 **O que é o Modelo C4?**
+
+O **Modelo C4** é como um **mapa com diferentes níveis de zoom** para entender um sistema de software. Imagine que você está olhando uma cidade:
+
+- **C1 (Contexto)**: Vista de satélite - vê a cidade inteira e cidades vizinhas
+- **C2 (Contêineres)**: Vista aérea - vê bairros, estradas principais, aeroporto  
+- **C3 (Componentes)**: Vista de drone - vê quarteirões, edifícios específicos
+- **C4 (Código)**: Vista do térreo - vê dentro dos edifícios, salas, móveis
+
+---
+
+### 🌍 **Nível C1 - CONTEXTO: "A Vista Geral"**
+
+**👥 Para quem**: Gerentes, Product Owners, Stakeholders  
+**🎯 Pergunta que responde**: *"O que este sistema faz e quem o usa?"*
+
+#### **O que você vê no C1:**
+1. **Sistema SmartEnvios** (nossa "cidade")
+2. **Pessoas que usam**:
+   - **Cliente**: Pessoa que quer enviar pacotes
+   - **Administrador**: Pessoa que gerencia o sistema
+3. **Sistemas externos** (outras "cidades"):
+   - **API Carriers**: A transportadora de verdade
+   - **ViaCEP**: Serviço que sabe todos os endereços do Brasil
+   - **Email**: Sistema que manda e-mails
+   - **Pagamento**: Sistema que processa cartões de crédito
+
+#### **Como eles conversam:**
+```
+Cliente → SmartEnvios: "Quero cotação de frete"
+SmartEnvios → API Carriers: "Quanto custa enviar?"
+SmartEnvios → ViaCEP: "Este CEP existe?"
+SmartEnvios → Email: "Mande confirmação para o cliente"
+```
+
+#### **Por que começar aqui:**
+- ✅ **Todo mundo entende**: Não precisa ser técnico
+- ✅ **Mostra o valor**: Fica claro para que serve o sistema
+- ✅ **Define fronteiras**: O que é nosso e o que é de terceiros
+
+---
+
+### 📦 **Nível C2 - CONTÊINERES: "Os Bairros da Cidade"**
+
+**👥 Para quem**: Arquitetos, Tech Leads, DevOps  
+**🎯 Pergunta que responde**: *"Quais aplicações e bancos temos?"*
+
+#### **O que você vê no C2:**
+Agora olhamos **dentro** do SmartEnvios e vemos:
+
+1. **Frontend (React)**: A "loja" onde o cliente interage
+2. **API Gateway**: O "porteiro" que controla quem entra
+3. **3 Microserviços** (nossas "fábricas"):
+   - **Cotação**: Calcula preços
+   - **Rastreamento**: Monitora entregas
+   - **Contratação**: Cria contratos
+4. **Bancos de dados**:
+   - **MongoDB**: Onde guardamos tudo
+   - **Redis**: Memória rápida para coisas importantes
+   - **Kafka**: "Correio interno" entre os serviços
+
+#### **Como funciona o fluxo:**
+```
+1. Cliente acessa → Frontend React
+2. Frontend faz pedido → API Gateway
+3. Gateway decide → Qual microserviço chamar
+4. Microserviço processa → Salva no MongoDB
+5. Microserviço avisa outros → Via Kafka
+6. Resposta volta → Gateway → Frontend → Cliente
+```
+
+#### **Por que esta organização:**
+- ✅ **Escalabilidade**: Cada "fábrica" pode crescer independente
+- ✅ **Manutenção**: Se uma quebra, outras continuam
+- ✅ **Times**: Equipes podem trabalhar em paralelo
+- ✅ **Tecnologia**: Cada serviço pode usar a melhor ferramenta
+
+---
+
+### ⚙️ **Nível C3 - COMPONENTES: "Dentro de Cada Fábrica"**
+
+**👥 Para quem**: Desenvolvedores experientes  
+**🎯 Pergunta que responde**: *"Como cada microserviço está organizado por dentro?"*
+
+#### **O que você vê no C3:**
+Vamos **dentro do Microserviço de Rastreamento** (nossa fábrica principal):
+
+1. **Controller**: O "atendente" que recebe pedidos
+2. **Scheduler**: O "relógio" que trabalha sozinho
+3. **Use Cases**: O "cérebro" com as regras de negócio
+4. **Repository**: O "arquivo" que organiza dados
+5. **Carriers Client**: O "telefone" para falar com transportadora
+6. **Event Publisher**: O "carteiro" que manda avisos
+7. **Mapper**: O "tradutor" entre formatos diferentes
+8. **Validator**: O "fiscal" que verifica se está correto
+
+#### **Como trabalham juntos:**
+```
+1. Controller recebe → "Quero rastrear XYZ"
+2. Controller chama → Use Case
+3. Use Case pede → Repository: "Tem este código?"
+4. Use Case liga → Carriers Client: "Qual status?"
+5. Use Case processa → Novos eventos
+6. Use Case salva → Repository → MongoDB
+7. Use Case avisa → Event Publisher → Kafka
+8. Controller responde → "Aqui estão os eventos"
+```
+
+#### **Padrões importantes:**
+- 🏗️ **Arquitetura Hexagonal**: Use Case no centro, resto em volta
+- 📋 **Repository Pattern**: Interface única para dados
+- 🎯 **Single Responsibility**: Cada componente faz uma coisa só
+- 🔄 **Dependency Injection**: Componentes recebem o que precisam
+
+---
+
+### 🔧 **Nível C4 - CÓDIGO: "A Planta Baixa"**
+
+**👥 Para quem**: Desenvolvedores que vão implementar  
+**🎯 Pergunta que responde**: *"Que classes criar e que métodos implementar?"*
+
+#### **O que você vê no C4:**
+Agora vemos o **código que precisa ser escrito**:
+
+#### **Classes principais:**
+```typescript
+// 🎮 CONTROLLER - Recebe requisições
+class TrackingController {
+  +addTrackingCode()     // Adiciona novo código
+  +getTracking()         // Consulta status
+  +refreshTracking()     // Força atualização
+  +listTracking()        // Lista vários códigos
+}
+
+// 🧠 USE CASE - Regras de negócio
+class UpdateTrackingUseCase {
+  +execute()             // Método principal
+  -processNewEvents()    // Processa novos eventos
+  -updateTrackingStatus() // Atualiza status
+  -calculateNextCheck()  // Calcula próxima verificação
+}
+
+// 📊 ENTIDADES - Objetos do negócio  
+class TrackingCode {
+  +code: string          // "SM123456789BR"
+  +status: TrackingStatus // "Em trânsito"
+  +lastCheckedAt: Date   // Última verificação
+  +markAsDelivered()     // Marca como entregue
+}
+
+class TrackingEvent {
+  +timestamp: Date       // Quando aconteceu
+  +status: string        // "Saiu para entrega"
+  +location: string      // "São Paulo, SP"
+  +description: string   // Descrição completa
+}
+```
+
+#### **Fluxo de execução detalhado:**
+```
+📞 1. Cliente chama: controller.refreshTracking("SM123456789BR")
+     ↓
+🧠 2. Controller chama: useCase.execute("SM123456789BR")  
+     ↓
+🗃️ 3. UseCase pergunta: repository.findByCode("SM123456789BR")
+     ↓
+📞 4. UseCase liga: carriersClient.trackShipment("SM123456789BR")
+     ↓
+⚡ 5. UseCase processa: processNewEvents(tracking, newEvents)
+     ↓
+💾 6. UseCase salva: repository.save(updatedTracking)
+     ↓
+📢 7. UseCase avisa: eventPublisher.publish("tracking.updated")
+     ↓
+✅ 8. Controller responde: return updatedEvents
+```
+
+#### **O que você ganha com C4:**
+- ✅ **Guia direto**: Sabe exatamente que código escrever
+- ✅ **Nomes definidos**: Classes e métodos já nomeados
+- ✅ **Responsabilidades**: Cada classe tem função específica
+- ✅ **Testes**: Sabe o que testar em cada componente
+- ✅ **Padrões**: Segue arquitetura limpa automaticamente
+
+---
+
+### 🎯 **Resumo: Quando Usar Cada Nível**
+
+| Nível | Quando Usar | Exemplo de Pergunta |
+|-------|-------------|-------------------|
+| **C1** | Apresentar para chefe | "Para que serve este sistema?" |
+| **C2** | Planejar infraestrutura | "Quantos servidores precisamos?" |
+| **C3** | Definir responsabilidades | "Quem cuida do cache?" |
+| **C4** | Começar a programar | "Que método implementar primeiro?" |
+
+### 🔄 **Fluxo Natural de Trabalho:**
+
+```
+1. 📋 REUNIÃO (C1): "Vamos fazer sistema de frete"
+   ↓
+2. 🏗️ ARQUITETURA (C2): "Precisa de 3 microserviços + banco"  
+   ↓
+3. 👥 DESIGN (C3): "Cada serviço terá Controller + UseCase + Repository"
+   ↓
+4. 💻 CODING (C4): "Primeira classe: TrackingController..."
+```
+
+### 💡 **Dica Importante:**
+**Não pule níveis!** Cada nível responde perguntas diferentes. Se você pular do C1 direto para o C4, vai tomar decisões técnicas sem entender o contexto de negócio.
+
+**O segredo**: Cada nível é um **zoom mais próximo** do anterior. Mantenha a **consistência** entre todos os níveis - o que você promete no C1 deve ser entregue no C4!
+
 ## 📋 Documentação
 
 ### **ADRs (Architecture Decision Records)**
