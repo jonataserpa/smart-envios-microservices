@@ -19,6 +19,198 @@ O SmartEnvios é uma plataforma completa de microserviços para automação de p
 - API Gateway Pattern
 - Circuit Breaker Pattern
 
+## 🏛️ Arquitetura C4 - Diagramas do Sistema
+
+### **C1 - Diagrama de Contexto**
+*Visão geral do sistema e suas interações externas*
+
+```mermaid
+C4Context
+    title Contexto do Sistema SmartEnvios
+    
+    Person(cliente, "Cliente", "Pessoa física/jurídica que solicita cotações e contrata fretes")
+    Person(admin, "Administrador", "Gerencia o sistema e monitora operações")
+    
+    System(smartenvios, "SmartEnvios", "Sistema de microserviços para automação logística")
+    
+    System_Ext(carriers, "API Carriers", "Serviço externo de transportadora para cotações e rastreamento")
+    System_Ext(viacep, "ViaCEP", "Serviço externo para consulta de endereços por CEP")
+    System_Ext(email, "Serviço de Email", "Sistema externo para envio de notificações")
+    System_Ext(payment, "Gateway Pagamento", "Sistema externo para processamento de pagamentos")
+    
+    Rel(cliente, smartenvios, "Solicita cotações, contrata fretes, consulta rastreamento", "HTTPS")
+    Rel(admin, smartenvios, "Gerencia sistema, visualiza métricas", "HTTPS")
+    Rel(smartenvios, carriers, "Consulta preços, cria contratos, monitora entregas", "HTTPS/REST")
+    Rel(smartenvios, viacep, "Consulta endereços por CEP", "HTTPS/REST")
+    Rel(smartenvios, email, "Envia notificações de status", "SMTP")
+    Rel(smartenvios, payment, "Processa pagamentos de fretes", "HTTPS/REST")
+```
+
+### **C2 - Diagrama de Contêineres**
+*Aplicações e serviços que compõem o sistema*
+
+```mermaid
+C4Container
+    title Contêineres do Sistema SmartEnvios
+    
+    Person(cliente, "Cliente")
+    Person(admin, "Administrador")
+    
+    Container_Boundary(smartenvios, "SmartEnvios") {
+        Container(webapp, "Aplicação Web", "React/TypeScript", "Interface do usuário para cotações e contratação")
+        Container(gateway, "API Gateway", "Node.js/Express", "Ponto único de entrada, autenticação, rate limiting")
+        
+        Container(quoteservice, "Microserviço Cotação", "Node.js/TypeScript", "Calcula preços de frete e gerencia cotações")
+        Container(trackservice, "Microserviço Rastreamento", "Node.js/TypeScript", "Monitora status de entregas automaticamente")
+        Container(contractservice, "Microserviço Contratação", "Node.js/TypeScript", "Gerencia contratos e documentação")
+        
+        ContainerDb(mongodb, "MongoDB", "NoSQL Database", "Armazena cotações, contratos e eventos de rastreamento")
+        Container(redis, "Redis", "Cache/Session Store", "Cache de cotações e sessões de usuário")
+        Container(kafka, "Apache Kafka", "Message Broker", "Comunicação assíncrona entre microserviços")
+        
+        Container(monitoring, "Monitoramento", "Prometheus/Grafana", "Coleta métricas e monitora sistema")
+    }
+    
+    System_Ext(carriers, "API Carriers")
+    System_Ext(viacep, "ViaCEP")
+    System_Ext(email, "Email Service")
+    
+    Rel(cliente, webapp, "Acessa interface", "HTTPS")
+    Rel(admin, monitoring, "Visualiza métricas", "HTTPS")
+    Rel(webapp, gateway, "Faz requisições", "HTTPS/REST API")
+    
+    Rel(gateway, quoteservice, "Roteia cotações", "HTTP/REST")
+    Rel(gateway, trackservice, "Roteia rastreamento", "HTTP/REST")
+    Rel(gateway, contractservice, "Roteia contratos", "HTTP/REST")
+    
+    Rel(quoteservice, mongodb, "Salva cotações", "MongoDB Protocol")
+    Rel(trackservice, mongodb, "Salva eventos", "MongoDB Protocol")
+    Rel(contractservice, mongodb, "Salva contratos", "MongoDB Protocol")
+    
+    Rel(quoteservice, redis, "Cache cotações", "Redis Protocol")
+    Rel(gateway, redis, "Sessões usuário", "Redis Protocol")
+    
+    Rel(trackservice, kafka, "Publica eventos", "Kafka Protocol")
+    Rel(contractservice, kafka, "Publica eventos", "Kafka Protocol")
+    Rel(quoteservice, kafka, "Consome eventos", "Kafka Protocol")
+    
+    Rel(quoteservice, carriers, "Consulta preços", "HTTPS/REST")
+    Rel(trackservice, carriers, "Consulta status", "HTTPS/REST")
+    Rel(contractservice, carriers, "Cria contratos", "HTTPS/REST")
+    Rel(quoteservice, viacep, "Valida CEPs", "HTTPS/REST")
+```
+
+### **C3 - Diagrama de Componentes - Microserviço de Rastreamento**
+*Componentes internos do serviço de rastreamento*
+
+```mermaid
+C4Component
+    title Componentes do Microserviço de Rastreamento
+    
+    Container_Boundary(trackservice, "Microserviço Rastreamento") {
+        Component(controller, "Tracking Controller", "Express Controller", "Endpoints REST para gerenciar rastreamento")
+        Component(scheduler, "Tracking Scheduler", "Node-cron", "Agenda verificações periódicas automáticas")
+        Component(usecase, "Tracking Use Cases", "Business Logic", "Regras de negócio para rastreamento")
+        Component(repository, "Tracking Repository", "Data Access", "Interface para persistência de dados")
+        Component(carriersclient, "Carriers Client", "HTTP Client", "Cliente para API da transportadora")
+        Component(eventpublisher, "Event Publisher", "Kafka Producer", "Publica eventos de rastreamento")
+        Component(mapper, "Data Mapper", "Data Transformation", "Converte dados entre formatos")
+        Component(validator, "Business Validator", "Validation Logic", "Valida regras de negócio")
+    }
+    
+    ContainerDb(mongodb, "MongoDB")
+    Container(kafka, "Apache Kafka") 
+    System_Ext(carriers, "API Carriers")
+    
+    Rel(controller, usecase, "Chama casos de uso", "Method Call")
+    Rel(scheduler, usecase, "Dispara verificações", "Method Call")
+    Rel(usecase, repository, "Persiste dados", "Method Call")
+    Rel(usecase, carriersclient, "Consulta status", "HTTP")
+    Rel(usecase, eventpublisher, "Publica eventos", "Method Call")
+    Rel(usecase, mapper, "Transforma dados", "Method Call")
+    Rel(usecase, validator, "Valida regras", "Method Call")
+    
+    Rel(repository, mongodb, "Salva/consulta", "MongoDB Protocol")
+    Rel(eventpublisher, kafka, "Publica", "Kafka Protocol")
+    Rel(carriersclient, carriers, "HTTP Request", "HTTPS/REST")
+```
+
+### **C3 - Diagrama de Componentes - Microserviço de Cotação**
+*Componentes internos do serviço de cotação*
+
+```mermaid
+C4Component
+    title Componentes do Microserviço de Cotação
+    
+    Container_Boundary(quoteservice, "Microserviço Cotação") {
+        Component(quotecontroller, "Quote Controller", "Express Controller", "Endpoints REST para cotações")
+        Component(quotelogic, "Quote Business Logic", "Domain Services", "Cálculos e validações de cotação")
+        Component(cacheservice, "Cache Service", "Redis Client", "Gerencia cache de cotações")
+        Component(quoterepo, "Quote Repository", "Data Access", "Persistência de cotações")
+        Component(carriersapi, "Carriers API Client", "HTTP Client", "Integração com transportadora")
+        Component(pricecalc, "Price Calculator", "Business Logic", "Algoritmos de cálculo de preço")
+        Component(quotevalidator, "Quote Validator", "Validation", "Validações específicas de cotação")
+        Component(quotemapper, "Quote Mapper", "Data Transform", "Mapeamento de dados")
+    }
+    
+    ContainerDb(mongodb, "MongoDB")
+    Container(redis, "Redis Cache")
+    Container(kafka, "Apache Kafka")
+    System_Ext(carriers, "API Carriers")
+    
+    Rel(quotecontroller, quotelogic, "Processa cotação", "Method Call")
+    Rel(quotelogic, cacheservice, "Verifica cache", "Method Call")
+    Rel(quotelogic, quoterepo, "Salva cotação", "Method Call")
+    Rel(quotelogic, carriersapi, "Busca preços", "HTTP")
+    Rel(quotelogic, pricecalc, "Calcula preços", "Method Call")
+    Rel(quotelogic, quotevalidator, "Valida dados", "Method Call")
+    Rel(quotelogic, quotemapper, "Mapeia dados", "Method Call")
+    
+    Rel(quoterepo, mongodb, "Persiste", "MongoDB Protocol")
+    Rel(cacheservice, redis, "Cache", "Redis Protocol")
+    Rel(carriersapi, carriers, "Request", "HTTPS/REST")
+```
+
+### **Fluxo de Dados - Event-Driven Architecture**
+*Como os eventos fluem pelo sistema*
+
+```mermaid
+flowchart TD
+    A[Cliente solicita cotação] --> B[Gateway API]
+    B --> C[Microserviço Cotação]
+    C --> D[API Carriers]
+    D --> C
+    C --> E[MongoDB - Salva cotação]
+    C --> F[Kafka - Evento cotação calculada]
+    
+    G[Cliente contrata frete] --> B
+    B --> H[Microserviço Contratação]
+    H --> I[Gera documentos]
+    H --> J[Cria contrato na transportadora]
+    H --> K[MongoDB - Salva contrato]
+    H --> L[Kafka - Evento contrato criado]
+    
+    L --> M[Microserviço Rastreamento]
+    M --> N[Adiciona código para monitoramento]
+    
+    O[Scheduler - A cada 5-60min] --> M
+    M --> P[Consulta API Carriers]
+    P --> M
+    M --> Q[MongoDB - Atualiza eventos]
+    M --> R[Kafka - Evento status alterado]
+    
+    R --> S[Serviço Notificação]
+    S --> T[Email/SMS para cliente]
+    
+    R --> U[Dashboard Admin]
+    U --> V[Métricas em tempo real]
+    
+    style A fill:#e1f5fe
+    style G fill:#e1f5fe
+    style T fill:#c8e6c9
+    style V fill:#c8e6c9
+```
+
 ## 📋 Documentação
 
 ### **ADRs (Architecture Decision Records)**
