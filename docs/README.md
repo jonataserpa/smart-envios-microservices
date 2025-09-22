@@ -14,6 +14,7 @@ Documentos detalhados descrevendo requisitos e especificações de cada componen
 ### 🏗️ Architecture
 Diagramas e documentação arquitetural:
 
+- **[Estratégia de Microserviços](architecture/microservices-strategy.md)** - Por que múltiplos microserviços e como eles se relacionam
 - Diagramas de arquitetura
 - Fluxos de dados
 - Padrões de design utilizados

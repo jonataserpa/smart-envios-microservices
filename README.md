@@ -19,6 +19,9 @@ O SmartEnvios é uma plataforma completa de microserviços para automação de p
 - API Gateway Pattern
 - Circuit Breaker Pattern
 
+> 💡 **Quer entender por que temos múltiplos microserviços?**  
+> Leia nossa [**Estratégia de Microserviços**](docs/architecture/microservices-strategy.md) que explica detalhadamente a relação entre Cotação, Contratação e Rastreamento.
+
 ## 🏛️ Arquitetura C4 - Diagramas do Sistema
 
 ### **C1 - Diagrama de Contexto**
