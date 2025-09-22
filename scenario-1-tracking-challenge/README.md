@@ -643,27 +643,6 @@ GET /api/v1/health
 
 ## ⏱️ Cronograma de Desenvolvimento
 
-### **📅 Prazo Total: 6 Dias Úteis**
-
-```mermaid
-gantt
-    title Cronograma - Microserviço de Rastreamento
-    dateFormat YYYY-MM-DD
-    
-    section Setup
-    Repositório e Docker     :done, setup, 2025-01-22, 1d
-    MongoDB + Kafka + Redis  :done, infra, 2025-01-22, 1d
-    
-    section Core Development  
-    API Base + Endpoints     :active, api, 2025-01-23, 1d
-    Integração Carriers      :carrier, after api, 1d
-    Scheduler + Jobs         :scheduler, after carrier, 1d
-    
-    section Quality & Deploy
-    Testes + Documentação    :testing, after scheduler, 1d
-    Docker + Health Checks   :deploy, after testing, 1d
-```
-
 ### **🎯 Detalhamento por Dia:**
 
 #### **Dia 1: Setup e Infraestrutura** 
