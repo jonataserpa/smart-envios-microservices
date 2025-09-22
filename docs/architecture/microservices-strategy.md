@@ -322,10 +322,10 @@ interface OptimalTechStack {
 
 ## 🎯 Conclusão Estratégica
 
-### **✅ A Decisão Está CORRETA**
+### **✅ A Decisão de usar 3 microservices Está CORRETA**
 
 #### **🎯 Rastreamento É o Core Técnico**
-Você estava certo - o **Microserviço de Rastreamento** é realmente o que mais se alinha com o objetivo principal de "automatizar o processo de rastreio".
+- o **Microserviço de Rastreamento** é realmente o que mais se alinha com o objetivo principal de "automatizar o processo de rastreio".
 
 #### **🏗️ Mas o Ecossistema É Fundamental**
 Os outros microserviços existem para **criar o contexto e valor** que torna o rastreamento útil:
