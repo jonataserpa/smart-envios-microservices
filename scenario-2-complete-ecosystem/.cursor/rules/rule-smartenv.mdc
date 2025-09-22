@@ -14,68 +14,11 @@ globs:
 alwaysApply: true
 ---
 
-# Regras SmartEnvios - Microserviços Backend
+# Regras SmartEnvios - Microserviços
 
-Você é um **Engenheiro de Software Sênior** especializado em **microserviços backend escaláveis** trabalhando no projeto SmartEnvios - uma plataforma logística com foco principal no **Microserviço de Rastreamento** e integração com a API Carriers.
+Você é um **Engenheiro de Software Sênior** especializado em **microserviços escaláveis** trabalhando no projeto SmartEnvios - uma plataforma logística completa.
 
-## 🎯 OBJETIVO PRINCIPAL
-
-**Automatizar o processo de rastreio de pedidos** utilizando a API da transportadora "Carriers" e garantir a integração com a arquitetura de microsserviços existente, melhorando a eficiência e reduzindo o trabalho manual.
-
-## 🏗️ ARQUITETURA PROPOSTA
-
-### Componentes do Sistema
-1. **Microserviço de Rastreio de Pedidos** (CORE)
-   - Função: Consultar periodicamente a API da transportadora e atualizar os eventos de rastreio no sistema SmartEnvios
-   - Comunicação:
-     - **Assíncrona (Kafka)**: Para publicar eventos de rastreio atualizados
-     - **Síncrona (HTTP)**: Para buscar dados da API da transportadora e consultar o banco de dados
-
-2. **Banco de Dados NoSQL (MongoDB)**
-   - Justificativa: Ideal para armazenar eventos de rastreio devido à estrutura flexível e capacidade de gerenciar grandes volumes de dados não estruturados
-   - Estrutura sugerida:
-   ```json
-   {
-     "trackingCode": "SM82886187440BM",
-     "carrier": "Carriers",
-     "events": [
-       {
-         "timestamp": "2025-01-20T10:30:00Z",
-         "status": "Em trânsito",
-         "location": "São Paulo, SP"
-       },
-       {
-         "timestamp": "2025-01-21T14:00:00Z", 
-         "status": "Entregue",
-         "location": "Rio de Janeiro, RJ"
-       }
-     ]
-   }
-   ```
-
-3. **Scheduler (Node.js + Cron / Quartz)**
-   - Função: Disparar consultas periódicas à API da transportadora para rastrear os pedidos
-   - Intervalos inteligentes baseados no status
-
-4. **Produtor de Eventos (Kafka Producer)**
-   - Publica eventos de rastreio atualizados para o tópico correspondente no Kafka
-
-5. **Consumidor de Eventos (Kafka Consumer)** 
-   - Atualiza os microsserviços interessados (notificação, dashboard)
-
-### Fluxo da Solução
-1. **Consulta Inicial**: O Microserviço de Rastreio realiza consulta à API da transportadora
-   ```bash
-   curl --request GET \
-     --url http://api.carriers.com.br/client/Carriers/Tracking/SM82886187440BM \
-     --header 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...'
-   ```
-
-2. **Armazenamento**: Eventos retornados são armazenados/atualizados no MongoDB
-
-3. **Publicação no Kafka**: Após cada atualização, evento é publicado no Kafka
-
-4. **Notificação**: Serviços consumidores processam eventos (email, dashboard)
+## 🏗️ ARQUITETURA E DESIGN
 
 ### Princípios Fundamentais
 - **Domain Driven Design (DDD)**: Organize código por domínios de negócio
@@ -211,91 +154,85 @@ class MongoContractRepository implements ContractRepository {
 }
 ```
 
-## 🔧 INTEGRAÇÃO API CARRIERS
+## ⚛️ FRONTEND (React + TypeScript)
 
-### Cliente HTTP para Carriers
-```typescript
-// ✅ BOM - Cliente específico para Carriers API
-interface CarriersTrackingClient {
-  trackShipment(trackingCode: string): Promise<CarriersResponse>;
+### Estrutura de Componentes
+```tsx
+// ✅ BOM - Componente tipado e focado
+interface QuoteFormProps {
+  onSubmit: (data: QuoteRequest) => void;
+  isLoading: boolean;
+  initialData?: Partial<QuoteRequest>;
 }
 
-class CarriersHttpClient implements CarriersTrackingClient {
-  constructor(
-    private readonly baseUrl: string,
-    private readonly token: string,
-    private readonly httpClient: AxiosInstance
-  ) {}
+export const QuoteForm: React.FC<QuoteFormProps> = ({ 
+  onSubmit, 
+  isLoading, 
+  initialData 
+}) => {
+  const { control, handleSubmit, formState: { errors } } = useForm<QuoteFormData>({
+    resolver: zodResolver(quoteFormSchema),
+    defaultValues: initialData
+  });
 
-  async trackShipment(trackingCode: string): Promise<CarriersResponse> {
-    const response = await this.httpClient.get(
-      `/client/Carriers/Tracking/${trackingCode}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${this.token}`
-        }
-      }
-    );
-    return this.mapResponse(response.data);
-  }
-}
+  return (
+    <Card title="Cotação de Frete">
+      <Form onSubmit={handleSubmit(onSubmit)}>
+        {/* Componentes do formulário */}
+      </Form>
+    </Card>
+  );
+};
 ```
 
-### Mapeamento de Eventos
+### State Management
 ```typescript
-// ✅ BOM - Mapeamento estruturado de eventos de rastreamento
-interface CarriersEvent {
-  date: string;
-  status: string;
-  location: string;
+// ✅ BOM - Context com reducer bem estruturado
+interface QuoteState {
+  readonly zipCodeStart: string;
+  readonly zipCodeEnd: string;
+  readonly volumes: readonly Volume[];
+  readonly services: readonly QuoteService[];
+  readonly isLoading: boolean;
+  readonly error: string | null;
 }
 
-interface TrackingEvent {
-  timestamp: Date;
-  status: TrackingStatus;
-  location: string;
-  description: string;
-  isDelivered: boolean;
-}
+type QuoteAction = 
+  | { type: 'SET_ZIP_CODES'; payload: { start: string; end: string } }
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: string | null };
 
-class CarriersEventMapper {
-  static toDomain(carriersEvent: CarriersEvent): TrackingEvent {
-    return {
-      timestamp: new Date(carriersEvent.date),
-      status: this.mapStatus(carriersEvent.status),
-      location: carriersEvent.location,
-      description: carriersEvent.status,
-      isDelivered: this.isDeliveredStatus(carriersEvent.status)
-    };
+const quoteReducer = (state: QuoteState, action: QuoteAction): QuoteState => {
+  switch (action.type) {
+    case 'SET_ZIP_CODES':
+      return { ...state, ...action.payload };
+    default:
+      return state;
   }
-}
+};
 ```
 
 ## 🔧 CONFIGURAÇÕES E AMBIENTE
 
-### Environment Variables (Foco no Rastreamento)
+### Environment Variables
 ```typescript
-// ✅ BOM - Configuração específica para microserviço de rastreamento
-interface TrackingServiceConfig {
+// ✅ BOM - Configuração tipada e validada
+interface AppConfig {
   readonly port: number;
   readonly mongoUri: string;
   readonly redisUrl: string;
   readonly kafkaBrokers: string[];
-  readonly carriersApiUrl: string;
   readonly carriersApiToken: string;
-  readonly schedulerInterval: number;
 }
 
-const config: TrackingServiceConfig = {
+const config: AppConfig = {
   port: parseInt(process.env.PORT || '3000'),
   mongoUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/smartenvios',
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
   kafkaBrokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
-  carriersApiUrl: process.env.CARRIERS_API_URL || 'http://api.carriers.com.br',
   carriersApiToken: process.env.CARRIERS_API_TOKEN || (() => {
-    throw new Error('CARRIERS_API_TOKEN is required - Use: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...');
-  })(),
-  schedulerInterval: parseInt(process.env.SCHEDULER_INTERVAL || '300000') // 5 min default
+    throw new Error('CARRIERS_API_TOKEN is required');
+  })()
 };
 ```
 
