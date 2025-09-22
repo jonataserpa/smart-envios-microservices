@@ -538,39 +538,611 @@ sequenceDiagram
 
 ---
 
-## 🎯 Endpoints da API
+## 📋 **Principais Operações da API - Guia Detalhado**
 
-### **📥 Adicionar Código de Rastreamento**
+### **🔄 Ordem de Execução Típica**
+
+```mermaid
+graph TD
+    A[1. Health Check] --> B[2. Adicionar Código]
+    B --> C[3. Consultar Status]
+    C --> D{Precisa Atualizar?}
+    D -->|Sim| E[4. Forçar Refresh]
+    D -->|Não| F[5. Monitorar via Scheduler]
+    E --> F
+    F --> G[6. Listar Códigos]
+    G --> H[7. Métricas/Monitoring]
+    
+    style A fill:#e1f5fe
+    style B fill:#c8e6c9
+    style C fill:#fff3e0
+    style E fill:#ffcdd2
+    style F fill:#f3e5f5
+    style G fill:#e8f5e8
+    style H fill:#fce4ec
+```
+
+---
+
+### **🟢 1. Health Check - Verificação de Saúde**
+
 ```http
-POST /api/v1/tracking
-Content-Type: application/json
+GET /api/v1/health
+```
 
+**📝 Contexto:**
+- **Primeira operação** a ser executada
+- Verifica se o serviço está funcionando
+- Testa conectividade com dependências externas
+- Usado por load balancers e monitoring
+
+**🔧 Request:**
+```bash
+curl -X GET http://localhost:3000/api/v1/health
+```
+
+**📤 Response (Saudável):**
+```json
 {
-  "trackingCode": "SM82886187440BM",
-  "carrier": "Carriers",
-  "contractId": "12345",
-  "customerId": "customer_123"
+  "status": "healthy",
+  "timestamp": "2025-01-22T10:30:00.000Z",
+  "version": "1.0.0",
+  "uptime": 3600,
+  "dependencies": {
+    "mongodb": {
+      "status": "connected",
+      "responseTime": "12ms"
+    },
+    "redis": {
+      "status": "connected", 
+      "responseTime": "3ms"
+    },
+    "kafka": {
+      "status": "connected",
+      "responseTime": "8ms"
+    },
+    "carriersApi": {
+      "status": "available",
+      "responseTime": "145ms"
+    }
+  },
+  "metrics": {
+    "activeTrackingCodes": 1250,
+    "processedToday": 3420,
+    "errorRate": "0.2%",
+    "avgResponseTime": "89ms"
+  }
 }
 ```
 
-### **🔍 Consultar Rastreamento** 
-```http
-GET /api/v1/tracking/SM82886187440BM
+**⚠️ Response (Não Saudável):**
+```json
+{
+  "status": "unhealthy",
+  "timestamp": "2025-01-22T10:30:00.000Z",
+  "errors": [
+    {
+      "service": "carriersApi",
+      "status": "unavailable",
+      "error": "Connection timeout",
+      "impact": "high"
+    }
+  ]
+}
 ```
 
-### **🔄 Forçar Atualização**
+---
+
+### **➕ 2. Adicionar Código de Rastreamento**
+
 ```http
-POST /api/v1/tracking/SM82886187440BM/refresh
+POST /api/v1/tracking
 ```
 
-### **📋 Listar Rastreamentos**
-```http
-GET /api/v1/tracking?customerId=customer_123&status=in_transit
+**📝 Contexto:**
+- **Primeira operação funcional** após health check
+- Inicia o monitoramento de um novo código
+- Faz consulta inicial à API Carriers
+- Agenda próximas verificações automáticas
+
+**🔧 Request:**
+```bash
+curl -X POST http://localhost:3000/api/v1/tracking \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "trackingCode": "SM82886187440BM",
+    "carrier": "Carriers",
+    "customerId": "customer_123",
+    "description": "Encomenda para João Silva",
+    "metadata": {
+      "orderId": "ORD-001",
+      "priority": "normal"
+    }
+  }'
 ```
 
-### **⚙️ Health Check**
+**📤 Response (Sucesso):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "tracking_64f1a2b3c4d5e6f7g8h9i0j1",
+    "trackingCode": "SM82886187440BM",
+    "carrier": "Carriers",
+    "status": "active",
+    "customerId": "customer_123",
+    "createdAt": "2025-01-22T10:35:00.000Z",
+    "lastCheckedAt": "2025-01-22T10:35:00.000Z",
+    "nextCheckAt": "2025-01-22T10:40:00.000Z",
+    "events": [
+      {
+        "id": "event_1",
+        "timestamp": "2025-01-20T10:30:00.000Z",
+        "status": "Postado",
+        "location": "São Paulo, SP",
+        "description": "Objeto postado",
+        "isDelivered": false
+      }
+    ],
+    "summary": {
+      "totalEvents": 1,
+      "currentStatus": "Postado",
+      "isDelivered": false,
+      "estimatedDelivery": null
+    }
+  },
+  "message": "Código de rastreamento adicionado com sucesso"
+}
+```
+
+**❌ Response (Erro):**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_TRACKING_CODE",
+    "message": "Código de rastreamento inválido ou não encontrado",
+    "details": {
+      "trackingCode": "SM82886187440BM",
+      "carrier": "Carriers",
+      "carrierResponse": "Tracking code not found"
+    }
+  }
+}
+```
+
+---
+
+### **🔍 3. Consultar Código Específico**
+
 ```http
-GET /api/v1/health
+GET /api/v1/tracking/{code}
+```
+
+**📝 Contexto:**
+- **Operação mais frequente** após adicionar código
+- Retorna status atual sem forçar atualização
+- Dados podem vir do cache (Redis) para performance
+- Usado para consultas em tempo real
+
+**🔧 Request:**
+```bash
+curl -X GET http://localhost:3000/api/v1/tracking/SM82886187440BM \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+**📤 Response (Encontrado):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "tracking_64f1a2b3c4d5e6f7g8h9i0j1",
+    "trackingCode": "SM82886187440BM",
+    "carrier": "Carriers",
+    "status": "active",
+    "customerId": "customer_123",
+    "createdAt": "2025-01-22T10:35:00.000Z",
+    "lastCheckedAt": "2025-01-22T11:35:00.000Z",
+    "nextCheckAt": "2025-01-22T12:05:00.000Z",
+    "events": [
+      {
+        "id": "event_1",
+        "timestamp": "2025-01-20T10:30:00.000Z",
+        "status": "Postado",
+        "location": "São Paulo, SP",
+        "description": "Objeto postado",
+        "isDelivered": false
+      },
+      {
+        "id": "event_2",
+        "timestamp": "2025-01-21T14:20:00.000Z",
+        "status": "Em trânsito",
+        "location": "Campinas, SP",
+        "description": "Objeto em trânsito",
+        "isDelivered": false
+      },
+      {
+        "id": "event_3",
+        "timestamp": "2025-01-22T09:15:00.000Z",
+        "status": "Saiu para entrega",
+        "location": "Rio de Janeiro, RJ",
+        "description": "Objeto saiu para entrega",
+        "isDelivered": false
+      }
+    ],
+    "summary": {
+      "totalEvents": 3,
+      "currentStatus": "Saiu para entrega",
+      "isDelivered": false,
+      "estimatedDelivery": "2025-01-22T18:00:00.000Z",
+      "daysSincePosted": 2,
+      "timeline": {
+        "posted": "2025-01-20T10:30:00.000Z",
+        "inTransit": "2025-01-21T14:20:00.000Z",
+        "outForDelivery": "2025-01-22T09:15:00.000Z",
+        "delivered": null
+      }
+    },
+    "metadata": {
+      "orderId": "ORD-001",
+      "priority": "normal",
+      "lastUpdateSource": "scheduler",
+      "cacheHit": true
+    }
+  }
+}
+```
+
+**❌ Response (Não Encontrado):**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "TRACKING_NOT_FOUND",
+    "message": "Código de rastreamento não encontrado",
+    "details": {
+      "trackingCode": "SM82886187440BM"
+    }
+  }
+}
+```
+
+---
+
+### **🔄 4. Forçar Atualização (Refresh)**
+
+```http
+POST /api/v1/tracking/{code}/refresh
+```
+
+**📝 Contexto:**
+- **Operação sob demanda** quando precisa de dados em tempo real
+- Ignora cache e consulta diretamente a API Carriers
+- Atualiza eventos e reagenda próxima verificação
+- Usado quando cliente solicita status mais recente
+
+**🔧 Request:**
+```bash
+curl -X POST http://localhost:3000/api/v1/tracking/SM82886187440BM/refresh \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "force": true,
+    "reason": "customer_request"
+  }'
+```
+
+**📤 Response (Sucesso - Novos Eventos):**
+```json
+{
+  "success": true,
+  "data": {
+    "trackingCode": "SM82886187440BM",
+    "refreshedAt": "2025-01-22T11:45:00.000Z",
+    "changes": {
+      "hasNewEvents": true,
+      "newEventsCount": 1,
+      "statusChanged": true,
+      "previousStatus": "Saiu para entrega",
+      "currentStatus": "Entregue"
+    },
+    "events": [
+      {
+        "id": "event_4",
+        "timestamp": "2025-01-22T11:30:00.000Z",
+        "status": "Entregue",
+        "location": "Rio de Janeiro, RJ",
+        "description": "Objeto entregue ao destinatário",
+        "isDelivered": true,
+        "recipient": "João Silva"
+      }
+    ],
+    "summary": {
+      "totalEvents": 4,
+      "currentStatus": "Entregue",
+      "isDelivered": true,
+      "deliveredAt": "2025-01-22T11:30:00.000Z",
+      "deliveryTime": {
+        "days": 2,
+        "hours": 1,
+        "totalMinutes": 2940
+      }
+    },
+    "nextAction": {
+      "schedulerStatus": "deactivated",
+      "reason": "Package delivered",
+      "finalCheck": "2025-01-23T11:45:00.000Z"
+    }
+  },
+  "message": "Rastreamento atualizado com sucesso - Pacote entregue!"
+}
+```
+
+**📤 Response (Sucesso - Sem Mudanças):**
+```json
+{
+  "success": true,
+  "data": {
+    "trackingCode": "SM82886187440BM", 
+    "refreshedAt": "2025-01-22T11:45:00.000Z",
+    "changes": {
+      "hasNewEvents": false,
+      "newEventsCount": 0,
+      "statusChanged": false,
+      "currentStatus": "Saiu para entrega"
+    },
+    "nextCheckAt": "2025-01-22T12:15:00.000Z"
+  },
+  "message": "Nenhuma atualização encontrada"
+}
+```
+
+---
+
+### **📋 5. Listar Códigos com Filtros**
+
+```http
+GET /api/v1/tracking
+```
+
+**📝 Contexto:**
+- **Operação de overview** para dashboards e relatórios
+- Permite filtros avançados e paginação
+- Retorna resumo de múltiplos rastreamentos
+- Usado para monitoramento em massa
+
+**🔧 Request (Filtros Básicos):**
+```bash
+curl -X GET "http://localhost:3000/api/v1/tracking?customerId=customer_123&status=active&page=1&limit=10" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+**🔧 Request (Filtros Avançados):**
+```bash
+curl -X GET "http://localhost:3000/api/v1/tracking?carrier=Carriers&isDelivered=false&createdAt[gte]=2025-01-20&sort=-createdAt" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+**📤 Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "tracking_64f1a2b3c4d5e6f7g8h9i0j1",
+        "trackingCode": "SM82886187440BM",
+        "carrier": "Carriers",
+        "customerId": "customer_123",
+        "status": "active",
+        "currentStatus": "Saiu para entrega",
+        "isDelivered": false,
+        "createdAt": "2025-01-22T10:35:00.000Z",
+        "lastEventAt": "2025-01-22T09:15:00.000Z",
+        "eventsCount": 3,
+        "daysSincePosted": 2
+      },
+      {
+        "id": "tracking_74g2b3c4d5e6f7g8h9i0j1k2",
+        "trackingCode": "SM82886187441BM",
+        "carrier": "Carriers",
+        "customerId": "customer_123",
+        "status": "completed",
+        "currentStatus": "Entregue",
+        "isDelivered": true,
+        "createdAt": "2025-01-21T15:20:00.000Z",
+        "deliveredAt": "2025-01-22T10:45:00.000Z",
+        "eventsCount": 5,
+        "deliveryTime": {
+          "days": 0,
+          "hours": 19,
+          "totalMinutes": 1145
+        }
+      }
+    ],
+    "pagination": {
+      "currentPage": 1,
+      "totalPages": 5,
+      "totalItems": 48,
+      "itemsPerPage": 10,
+      "hasNextPage": true,
+      "hasPreviousPage": false
+    },
+    "filters": {
+      "applied": {
+        "customerId": "customer_123",
+        "status": "active"
+      },
+      "available": {
+        "status": ["active", "completed", "inactive"],
+        "carrier": ["Carriers", "Correios", "Jadlog"],
+        "isDelivered": [true, false]
+      }
+    },
+    "summary": {
+      "totalActive": 23,
+      "totalCompleted": 25,
+      "averageDeliveryTime": "1.5 days",
+      "successRate": "97.9%"
+    }
+  }
+}
+```
+
+---
+
+### **⚡ 6. Métricas Prometheus**
+
+```http
+GET /metrics
+```
+
+**📝 Contexto:**
+- **Operação de monitoramento** para observabilidade
+- Expõe métricas no formato Prometheus
+- Usado por sistemas de alertas e dashboards
+- Não requer autenticação (endpoint público)
+
+**🔧 Request:**
+```bash
+curl -X GET http://localhost:3000/metrics
+```
+
+**📤 Response (Formato Prometheus):**
+```prometheus
+# HELP tracking_codes_total Total number of tracking codes
+# TYPE tracking_codes_total counter
+tracking_codes_total{status="active"} 1250
+tracking_codes_total{status="completed"} 3420
+tracking_codes_total{status="inactive"} 89
+
+# HELP tracking_events_processed_total Total number of events processed
+# TYPE tracking_events_processed_total counter
+tracking_events_processed_total{carrier="Carriers"} 15670
+tracking_events_processed_total{carrier="Correios"} 8230
+
+# HELP tracking_api_requests_duration_seconds Duration of API requests
+# TYPE tracking_api_requests_duration_seconds histogram
+tracking_api_requests_duration_seconds_bucket{endpoint="/tracking",method="GET",le="0.1"} 1250
+tracking_api_requests_duration_seconds_bucket{endpoint="/tracking",method="GET",le="0.5"} 2100
+tracking_api_requests_duration_seconds_bucket{endpoint="/tracking",method="GET",le="1.0"} 2300
+tracking_api_requests_duration_seconds_bucket{endpoint="/tracking",method="GET",le="+Inf"} 2350
+
+# HELP tracking_scheduler_runs_total Number of scheduler executions
+# TYPE tracking_scheduler_runs_total counter
+tracking_scheduler_runs_total{status="success"} 1440
+tracking_scheduler_runs_total{status="error"} 12
+
+# HELP tracking_carrier_api_errors_total Errors from carrier API
+# TYPE tracking_carrier_api_errors_total counter
+tracking_carrier_api_errors_total{carrier="Carriers",error_type="timeout"} 5
+tracking_carrier_api_errors_total{carrier="Carriers",error_type="not_found"} 12
+tracking_carrier_api_errors_total{carrier="Carriers",error_type="rate_limit"} 3
+
+# HELP tracking_delivery_time_seconds Time from post to delivery
+# TYPE tracking_delivery_time_seconds histogram
+tracking_delivery_time_seconds_bucket{carrier="Carriers",le="86400"} 120
+tracking_delivery_time_seconds_bucket{carrier="Carriers",le="172800"} 890
+tracking_delivery_time_seconds_bucket{carrier="Carriers",le="259200"} 1250
+```
+
+---
+
+## 🔄 **Fluxo Completo de Uso**
+
+### **📋 Cenário Típico:**
+
+```mermaid
+sequenceDiagram
+    participant Client as Cliente/Frontend
+    participant API as Tracking API
+    participant DB as MongoDB
+    participant Carrier as Carriers API
+    participant Kafka as Kafka Broker
+    participant Scheduler as Background Scheduler
+
+    Note over Client,Scheduler: 🚀 Fluxo Completo de Rastreamento
+
+    %% 1. Health Check
+    Client->>API: GET /health
+    API-->>Client: ✅ Sistema saudável
+
+    %% 2. Adicionar código
+    Client->>API: POST /tracking (SM123...)
+    API->>Carrier: GET /Tracking/SM123...
+    Carrier-->>API: Eventos iniciais
+    API->>DB: Salvar código + eventos
+    API->>Kafka: Publish: tracking.added
+    API-->>Client: ✅ Código adicionado
+
+    %% 3. Monitoramento automático
+    Note over Scheduler: ⏰ A cada 1 minuto
+    Scheduler->>DB: Buscar códigos pendentes
+    DB-->>Scheduler: Lista de códigos
+    Scheduler->>Carrier: Verificar atualizações
+    Carrier-->>Scheduler: Novos eventos
+    Scheduler->>DB: Salvar novos eventos
+    Scheduler->>Kafka: Publish: tracking.updated
+
+    %% 4. Cliente consulta
+    Client->>API: GET /tracking/SM123...
+    API->>DB: Buscar dados (cache Redis)
+    DB-->>API: Eventos atualizados
+    API-->>Client: ✅ Status atual
+
+    %% 5. Refresh manual
+    Client->>API: POST /tracking/SM123.../refresh
+    API->>Carrier: Forçar consulta
+    Carrier-->>API: Status em tempo real
+    API->>DB: Atualizar se necessário
+    API->>Kafka: Publish se mudanças
+    API-->>Client: ✅ Dados atualizados
+
+    %% 6. Listagem
+    Client->>API: GET /tracking?filters...
+    API->>DB: Query com filtros
+    DB-->>API: Lista paginada
+    API-->>Client: ✅ Lista de rastreamentos
+
+    %% 7. Monitoramento
+    Note over Client: 📊 Sistemas de monitoramento
+    Client->>API: GET /metrics
+    API-->>Client: ✅ Métricas Prometheus
+```
+
+---
+
+## 💡 **Melhores Práticas de Uso**
+
+### **🎯 Ordem Recomendada:**
+
+1. **Sempre começar** com `GET /health` 
+2. **Adicionar códigos** via `POST /tracking`
+3. **Consultar status** via `GET /tracking/{code}`
+4. **Refresh manual** apenas quando necessário
+5. **Usar listagem** para dashboards
+6. **Monitorar métricas** continuamente
+
+### **⚠️ Limitações e Rate Limits:**
+
+```json
+{
+  "rateLimits": {
+    "global": "1000 req/min",
+    "perEndpoint": {
+      "POST /tracking": "100 req/min",
+      "POST /tracking/{code}/refresh": "20 req/min",
+      "GET /tracking/{code}": "500 req/min"
+    },
+    "perClient": "200 req/min"
+  },
+  "recommendations": {
+    "refreshFrequency": "Máximo 1x por 5 minutos",
+    "batchOperations": "Use listagem ao invés de múltiplas consultas",
+    "cache": "GET operations são cached por 1 minuto"
+  }
+}
 ```
 
 ---

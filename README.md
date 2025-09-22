@@ -41,14 +41,6 @@ Implementar **apenas o microserviço de rastreamento** como um desafio técnico 
 - ✅ **Scheduler** - Verificação periódica
 - ✅ **Documentação** - API e arquitetura
 
-#### **👥 Público-Alvo**
-- Desenvolvedores em processo seletivo
-- Validação de competências técnicas específicas
-- Prova de conceito isolada
-
-#### **⏱️ Prazo Estimado**
-**6 dias úteis** para implementação completa
-
 ---
 
 ### 🏗️ **Cenário 2: Ecossistema Completo de Microserviços**
