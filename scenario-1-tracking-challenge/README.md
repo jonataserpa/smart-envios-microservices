@@ -1052,8 +1052,7 @@ sequenceDiagram
         alt Sucesso
             CA-->>S: Dados válidos
             S->>DB: Reset error count
-            break
-        else Falha persistente
+        else Falha continua
             S->>ES: Incrementa error count
             S->>DB: UPDATE nextCheckAt = agora + (interval * 2^errorCount)
             Note over DB: Máximo 24h entre tentativas
