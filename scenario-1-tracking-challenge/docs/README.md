@@ -12,6 +12,19 @@ Esta documentação contém todos os artefatos técnicos necessários para imple
 
 ---
 
+## 🚀 **Guias de API e Integração**
+
+### [📋 Guia Detalhado das Operações da API](api/API-Operations-Guide.md)
+Documentação completa de todos os endpoints e operações:
+- **Ordem de execução**: Sequência típica das operações (Health Check → Adicionar → Consultar → etc.)
+- **Contexto detalhado**: Quando, por que e como usar cada endpoint
+- **Exemplos práticos**: Requests, responses e cenários reais de uso
+- **Rate limits**: Limitações, melhores práticas e recomendações
+- **Fluxos completos**: Do início ao fim com cenários realistas
+- **Monitoramento**: Métricas Prometheus e observabilidade
+
+---
+
 ## 🏗️ Architecture Decision Records (ADRs)
 
 ### [ADR-001: Arquitetura do Microserviço de Rastreamento](adrs/ADR-001-Tracking-Microservice-Architecture.md)
