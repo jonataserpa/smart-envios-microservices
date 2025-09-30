@@ -31,6 +31,8 @@
     "opossum": "^7.0.0",
     "prom-client": "^15.1.0",
     "redis": "^4.6.12",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
     "uuid": "^9.0.1",
     "winston": "^3.11.0",
     "zod": "^3.22.4"
@@ -44,6 +46,8 @@
     "@types/node-cron": "^3.0.11",
     "@types/opossum": "^8.1.9",
     "@types/supertest": "^6.0.2",
+    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/swagger-ui-express": "^4.1.8",
     "@types/uuid": "^9.0.7",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",

@@ -73,9 +73,19 @@ export class CarriersTrackingClient implements TrackingClient {
 
   async healthCheck(): Promise<boolean> {
     try {
-      const response = await this.httpClient.get('/health', { timeout: 5000 });
+      // Health check não requer autenticação
+      const response = await axios.get(`${this.config.baseUrl}/health`, { 
+        timeout: 5000,
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'SmartEnvios-Tracking/1.0'
+        }
+      });
       return response.status === 200;
-    } catch {
+    } catch (error) {
+      this.logger.warn('Health check da API Carriers falhou', { 
+        error: error instanceof Error ? error.message : String(error) 
+      });
       return false;
     }
   }

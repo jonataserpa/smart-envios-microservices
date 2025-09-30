@@ -1,0 +1,33 @@
+{
+  "name": "carriers-api-mock",
+  "version": "1.0.0",
+  "description": "Mock da API Carriers para simulação de rastreamento",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "compression": "^1.7.4",
+    "dotenv": "^16.3.1",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/swagger-ui-express": "^4.1.6"
+  },
+  "keywords": [
+    "mock",
+    "api",
+    "carriers",
+    "tracking",
+    "smartenvios"
+  ],
+  "author": "SmartEnvios Team",
+  "license": "MIT"
+}

@@ -31,6 +31,7 @@ import { ContractCreatedEventHandler } from '@application/event-handlers/Contrac
 // Middlewares
 import { errorHandler } from '@presentation/middlewares/errorHandler';
 import { requestLogger } from '@presentation/middlewares/requestLogger';
+import { setupSwagger } from '@presentation/middlewares/swagger';
 
 // Routes
 import { createTrackingRoutes } from '@presentation/routes/trackingRoutes';
@@ -64,6 +65,9 @@ class TrackingMicroservice {
     
     // Request logging
     this.app.use(requestLogger);
+    
+    // Swagger documentation
+    setupSwagger(this.app);
     
     // Logger para uso nos controllers
     this.app.set('logger', logger);

@@ -11,7 +11,7 @@ services:
       - MONGODB_URI=mongodb://admin:admin123@mongodb:27017/tracking?authSource=admin
       - REDIS_URL=redis://redis:6379
       - KAFKA_BROKERS=kafka:9092
-      - CARRIERS_API_URL=http://api.carriers.com.br
+      - CARRIERS_API_URL=http://172.17.0.1:3001
       - CARRIERS_API_TOKEN=${CARRIERS_API_TOKEN}
     depends_on:
       - mongodb
