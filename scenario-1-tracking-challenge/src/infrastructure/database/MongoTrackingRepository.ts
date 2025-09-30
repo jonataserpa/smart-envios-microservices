@@ -261,8 +261,51 @@ export class MongoTrackingRepository implements TrackingRepository {
   }
 
   private mapToDomain(doc: TrackingCodeDocument): TrackingCode {
-    // Esta seria uma implementação mais complexa na prática
-    // Por simplicidade, vamos retornar os dados como estão
-    return doc as any;
+    const TrackingCode = require('@domain/entities/TrackingCode').TrackingCode;
+    const TrackingCodeId = require('@domain/value-objects/TrackingCodeId').TrackingCodeId;
+    const TrackingCodeValue = require('@domain/value-objects/TrackingCodeValue').TrackingCodeValue;
+    const CarrierValue = require('@domain/value-objects/CarrierValue').CarrierValue;
+    const TrackingStatus = require('@domain/value-objects/TrackingStatus').TrackingStatus;
+    const TrackingMetadata = require('@domain/value-objects/TrackingMetadata').TrackingMetadata;
+    const TrackingEvent = require('@domain/entities/TrackingEvent').TrackingEvent;
+
+    // Criar objetos de valor
+    const id = TrackingCodeId.create((doc._id as any).toString());
+    const code = TrackingCodeValue.create(doc.code);
+    const carrier = CarrierValue.create(doc.carrier);
+    const status = TrackingStatus.create(doc.status);
+    const metadata = TrackingMetadata.create(doc.metadata);
+
+    // Mapear eventos
+    const events = doc.events.map((eventDoc: any) => 
+      TrackingEvent.create({
+        trackingCodeId: (doc._id as any).toString(),
+        timestamp: new Date(eventDoc.timestamp),
+        status: eventDoc.status,
+        location: eventDoc.location,
+        description: eventDoc.description,
+        isDelivered: eventDoc.isDelivered,
+        isException: eventDoc.isException,
+        carrierRawData: eventDoc.carrierRawData
+      })
+    );
+
+    // Criar instância do TrackingCode usando reflexão
+    const trackingCode = Object.create(TrackingCode.prototype);
+    
+    // Definir propriedades privadas
+    Object.defineProperty(trackingCode, '_id', { value: id, writable: false });
+    Object.defineProperty(trackingCode, '_code', { value: code, writable: false });
+    Object.defineProperty(trackingCode, '_carrier', { value: carrier, writable: false });
+    Object.defineProperty(trackingCode, '_status', { value: status, writable: true });
+    Object.defineProperty(trackingCode, '_isActive', { value: doc.isActive, writable: true });
+    Object.defineProperty(trackingCode, '_lastCheckedAt', { value: new Date(doc.lastCheckedAt), writable: true });
+    Object.defineProperty(trackingCode, '_nextCheckAt', { value: new Date(doc.nextCheckAt), writable: true });
+    Object.defineProperty(trackingCode, '_checkInterval', { value: doc.checkInterval, writable: true });
+    Object.defineProperty(trackingCode, '_events', { value: events, writable: true });
+    Object.defineProperty(trackingCode, '_metadata', { value: metadata, writable: true });
+    Object.defineProperty(trackingCode, '_createdAt', { value: new Date(doc.createdAt), writable: false });
+
+    return trackingCode;
   }
 }

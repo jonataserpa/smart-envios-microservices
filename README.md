@@ -58,6 +58,7 @@ cd scenario-1-tracking-challenge
 | **Tracking Swagger** | http://localhost:3000/api-docs | 📖 Documentação interativa da Tracking API |
 | **Carriers Mock** | http://localhost:3001 | Mock da API Carriers |
 | **Carriers Swagger** | http://localhost:3001/api-docs | 📖 Documentação interativa do Carriers Mock |
+| **Kafka UI** | http://localhost:8080 | 🌐 Interface web para Kafka |
 | **Prometheus** | http://localhost:9090 | Métricas e monitoramento |
 | **Grafana** | http://localhost:3002 | Dashboards (admin/admin123) |
 
@@ -66,6 +67,14 @@ cd scenario-1-tracking-challenge
 ### 📖 Documentação Swagger
 - **Tracking API**: http://localhost:3000/api-docs
 - **Carriers Mock**: http://localhost:3001/api-docs
+
+### 🌐 Kafka UI - Interface Web
+- **URL**: http://localhost:8080
+- **Funcionalidades**:
+  - Visualizar tópicos e mensagens
+  - Monitorar consumidores e produtores
+  - Gerenciar configurações do cluster
+  - Visualizar métricas em tempo real
 
 ### Health Check
 ```bash
