@@ -57,7 +57,7 @@ const TrackingEventSchema = new Schema<TrackingEventDocument>({
 }, { _id: false });
 
 const TrackingCodeSchema = new Schema<TrackingCodeDocument>({
-  code: { type: String, required: true, unique: true },
+  code: { type: String, required: true },
   carrier: { type: String, required: true },
   status: { type: String, required: true },
   isActive: { type: Boolean, required: true, default: true },

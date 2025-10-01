@@ -7,6 +7,12 @@ export interface KafkaConsumerConfig {
   brokers: string[];
   clientId: string;
   groupId: string;
+  connectionTimeout?: number;
+  requestTimeout?: number;
+  retry?: {
+    initialRetryTime?: number;
+    retries?: number;
+  };
 }
 
 export class ContractCreatedEventHandler {
@@ -19,10 +25,25 @@ export class ContractCreatedEventHandler {
   ) {
     const kafka = new Kafka({
       clientId: config.clientId,
-      brokers: config.brokers
+      brokers: config.brokers,
+      connectionTimeout: config.connectionTimeout || 3000,
+      requestTimeout: config.requestTimeout || 25000,
+      retry: {
+        initialRetryTime: config.retry?.initialRetryTime || 100,
+        retries: config.retry?.retries || 8
+      }
     });
 
-    this.consumer = kafka.consumer({ groupId: config.groupId });
+    this.consumer = kafka.consumer({ 
+      groupId: config.groupId,
+      sessionTimeout: 30000,
+      heartbeatInterval: 3000,
+      maxBytesPerPartition: 1048576,
+      retry: {
+        initialRetryTime: config.retry?.initialRetryTime || 100,
+        retries: config.retry?.retries || 8
+      }
+    });
   }
 
   async start(): Promise<void> {

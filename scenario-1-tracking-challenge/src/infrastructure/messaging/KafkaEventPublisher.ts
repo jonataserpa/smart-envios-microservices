@@ -6,6 +6,12 @@ import { KAFKA_TOPICS } from '@shared/constants';
 export interface KafkaConfig {
   brokers: string[];
   clientId: string;
+  connectionTimeout?: number;
+  requestTimeout?: number;
+  retry?: {
+    initialRetryTime?: number;
+    retries?: number;
+  };
 }
 
 export class KafkaEventPublisher implements EventPublisher {
@@ -17,10 +23,24 @@ export class KafkaEventPublisher implements EventPublisher {
   ) {
     const kafka = new Kafka({
       clientId: config.clientId,
-      brokers: config.brokers
+      brokers: config.brokers,
+      connectionTimeout: config.connectionTimeout || 3000,
+      requestTimeout: config.requestTimeout || 25000,
+      retry: {
+        initialRetryTime: config.retry?.initialRetryTime || 100,
+        retries: config.retry?.retries || 8
+      }
     });
 
-    this.producer = kafka.producer();
+    this.producer = kafka.producer({
+      maxInFlightRequests: 1,
+      idempotent: true,
+      transactionTimeout: 30000,
+      retry: {
+        initialRetryTime: config.retry?.initialRetryTime || 100,
+        retries: config.retry?.retries || 8
+      }
+    });
   }
 
   async connect(): Promise<void> {

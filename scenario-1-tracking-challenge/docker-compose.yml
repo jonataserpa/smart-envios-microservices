@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Aplicação principal
   tracking-service:
@@ -11,17 +9,22 @@ services:
       - MONGODB_URI=mongodb://admin:admin123@mongodb:27017/tracking?authSource=admin
       - REDIS_URL=redis://redis:6379
       - KAFKA_BROKERS=kafka:9092
+      - KAFKAJS_NO_PARTITIONER_WARNING=1
       - CARRIERS_API_URL=http://172.17.0.1:3001
       - CARRIERS_API_TOKEN=${CARRIERS_API_TOKEN}
     depends_on:
-      - mongodb
-      - redis
-      - kafka
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+      kafka:
+        condition: service_healthy
     volumes:
       - .:/app
       - /app/node_modules
     networks:
       - tracking-network
+    restart: unless-stopped
 
   # MongoDB para persistência
   mongodb:
@@ -60,20 +63,32 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:9093
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
       KAFKA_LOG_RETENTION_HOURS: 168
       KAFKA_LOG_SEGMENT_BYTES: 1073741824
       KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      KAFKAJS_NO_PARTITIONER_WARNING: 1
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
     ports:
+      - "9092:9092"
       - "9093:9093"
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_started
     volumes:
       - kafka_data:/var/lib/kafka/data
     networks:
       - tracking-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   # Zookeeper para Kafka
   zookeeper:
@@ -82,12 +97,20 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
     ports:
       - "2181:2181"
     volumes:
       - zookeeper_data:/var/lib/zookeeper/data
     networks:
       - tracking-network
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   # Prometheus para métricas
   prometheus:

@@ -20,7 +20,7 @@ RUN npm run build
 FROM node:20-alpine AS runtime
 
 # Instalar dependências do sistema
-RUN apk add --no-cache dumb-init
+RUN apk add --no-cache dumb-init netcat-openbsd
 
 # Criar usuário não-root
 RUN addgroup -g 1001 -S nodejs && \
@@ -34,6 +34,9 @@ RUN npm ci --only=production && npm cache clean --force
 
 # Copiar build do builder
 COPY --from=builder /app/dist ./dist
+
+# Copiar scripts
+COPY scripts/ ./scripts/
 
 # Criar diretórios necessários
 RUN mkdir -p logs && chown -R nodejs:nodejs /app
