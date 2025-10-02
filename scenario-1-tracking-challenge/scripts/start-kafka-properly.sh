@@ -91,7 +91,7 @@ check_kafka_health
 
 # Iniciar outros serviços
 echo "📦 Iniciando outros serviços..."
-docker compose up -d mongodb redis prometheus grafana kafka-ui redis-insight
+docker compose up -d mongodb redis prometheus grafana kafka-ui redis-commander
 
 # Aguardar MongoDB estar pronto
 wait_for_service "mongodb" 27017

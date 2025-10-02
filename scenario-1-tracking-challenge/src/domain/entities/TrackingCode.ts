@@ -34,8 +34,8 @@ export class TrackingCode {
       TrackingStatus.PENDING,
       true,
       new Date(),
-      new Date(Date.now() + 5 * 60 * 1000), // 5 min
-      300, // 5 min em segundos
+      new Date(Date.now() + 30 * 1000), // 30 segundos
+      30, // 30 segundos
       [],
       TrackingMetadata.create(data.metadata),
       new Date()

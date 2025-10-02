@@ -98,7 +98,14 @@ export class CarriersTrackingClient implements TrackingClient {
     // Validar estrutura da resposta
     this.validateResponse(response.data);
 
-    return response.data;
+    // Extrair dados da estrutura { success: true, data: { ... } }
+    const apiResponse = response.data;
+    if (apiResponse.success && apiResponse.data) {
+      return apiResponse.data;
+    }
+
+    // Fallback para estrutura direta (compatibilidade)
+    return apiResponse;
   }
 
   private createHttpClient(): AxiosInstance {
@@ -142,7 +149,15 @@ export class CarriersTrackingClient implements TrackingClient {
       throw new CarriersApiError('Resposta inválida da API Carriers');
     }
 
-    // Validação básica da estrutura
+    // Validação para estrutura { success: true, data: { ... } }
+    if (data.success && data.data) {
+      if (data.data.events && !Array.isArray(data.data.events)) {
+        throw new CarriersApiError('Campo events deve ser um array');
+      }
+      return;
+    }
+
+    // Validação para estrutura direta (compatibilidade)
     if (data.events && !Array.isArray(data.events)) {
       throw new CarriersApiError('Campo events deve ser um array');
     }
