@@ -1,6 +1,7 @@
 import { UpdateTrackingUseCase } from '../commands/UpdateTrackingUseCase';
 import { TrackingCode } from '@domain/entities/TrackingCode';
 import { TrackingRepository } from '@domain/repositories/TrackingRepository';
+import { MetricsController } from '@presentation/controllers/MetricsController';
 import * as cron from 'node-cron';
 
 export interface SchedulerConfig {
@@ -32,7 +33,9 @@ export class TrackingScheduler {
     this.jobHandle = setInterval(async () => {
       try {
         await this.processPendingTrackingCodes();
+        MetricsController.incrementSchedulerRuns('success');
       } catch (error) {
+        MetricsController.incrementSchedulerRuns('error');
         this.logger.error('Erro no scheduler principal', {
           error: error instanceof Error ? error.message : String(error)
         });

@@ -10,6 +10,7 @@ import {
   RateLimitError 
 } from '@shared/errors';
 import { CARRIERS_STATUS_MAP, EXCEPTION_STATUSES, DELIVERED_STATUSES } from '@shared/constants';
+import { MetricsController } from '@presentation/controllers/MetricsController';
 
 export class UpdateTrackingUseCase {
   constructor(
@@ -51,6 +52,9 @@ export class UpdateTrackingUseCase {
 
       // Cache da última verificação
       await this.cacheService.setLastCheck(trackingCode, Date.now());
+
+      // Incrementar métricas de eventos processados
+      MetricsController.incrementTrackingEvents(tracking.carrier, tracking.status.value);
 
       this.logger.info('Rastreamento atualizado com sucesso', {
         trackingCode,

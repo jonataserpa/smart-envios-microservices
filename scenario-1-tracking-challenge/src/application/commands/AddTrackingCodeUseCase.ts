@@ -7,6 +7,7 @@ import {
   TrackingAlreadyExistsError 
 } from '@shared/errors';
 import { TRACKING_CODE_PATTERNS } from '@shared/constants';
+import { MetricsController } from '@presentation/controllers/MetricsController';
 
 export interface TrackingCodeResponse {
   id: string;
@@ -81,6 +82,9 @@ export class AddTrackingCodeUseCase {
 
       // Salvar no repositório
       await this.trackingRepository.save(trackingCode);
+
+      // Incrementar métricas
+      MetricsController.incrementTrackingCodes(trackingCode.status.value, trackingCode.carrier);
 
       // Publicar evento
       await this.eventPublisher.publish('tracking.added', {
