@@ -27,6 +27,7 @@ import { KafkaEventPublisher } from '@infrastructure/messaging/KafkaEventPublish
 // Schedulers
 import { TrackingScheduler } from '@application/schedulers/TrackingScheduler';
 import { ContractCreatedEventHandler } from '@application/event-handlers/ContractCreatedEventHandler';
+import { DeliveredConsumer } from '@application/event-handlers/DeliveredConsumer';
 
 // Middlewares
 import { errorHandler } from '@presentation/middlewares/errorHandler';
@@ -41,6 +42,7 @@ class TrackingMicroservice {
   private server: any;
   private scheduler!: TrackingScheduler;
   private eventHandler!: ContractCreatedEventHandler;
+  private deliveredConsumer!: DeliveredConsumer;
   private cacheService!: RedisCacheService;
   private eventPublisher!: KafkaEventPublisher;
 
@@ -153,7 +155,7 @@ class TrackingMicroservice {
       logger
     );
 
-    // Event Handler
+    // Event Handlers
     this.eventHandler = new ContractCreatedEventHandler(
       {
         brokers: config.kafkaBrokers,
@@ -161,6 +163,15 @@ class TrackingMicroservice {
         groupId: config.kafkaGroupId
       },
       addTrackingUseCase,
+      logger
+    );
+
+    this.deliveredConsumer = new DeliveredConsumer(
+      {
+        brokers: config.kafkaBrokers,
+        clientId: config.kafkaClientId,
+        groupId: config.kafkaGroupId + '-delivered'
+      },
       logger
     );
 
@@ -201,6 +212,7 @@ class TrackingMicroservice {
       // Conectar ao Kafka
       await this.eventPublisher.connect();
       await this.eventHandler.start();
+      await this.deliveredConsumer.start();
       logger.info('Conectado ao Kafka');
 
       // Iniciar scheduler
@@ -235,8 +247,9 @@ class TrackingMicroservice {
       // Parar scheduler
       this.scheduler.stop();
 
-      // Parar event handler
+      // Parar event handlers
       await this.eventHandler.stop();
+      await this.deliveredConsumer.stop();
 
       // Desconectar do MongoDB
       await mongoose.disconnect();
