@@ -35,9 +35,11 @@ export class CarriersTrackingClient implements TrackingClient {
 
   async trackShipment(trackingCode: string): Promise<CarriersResponse> {
     try {
+      this.logger.info(`🚚 Consultando API Carriers para código: ${trackingCode}`);
+      
       const response = await this.circuitBreaker.fire(trackingCode);
       
-      this.logger.debug('Resposta da API Carriers recebida', {
+      this.logger.info(`✅ Resposta da API Carriers recebida para ${trackingCode}`, {
         trackingCode,
         eventsCount: (response as CarriersResponse).events?.length || 0
       });
@@ -45,7 +47,7 @@ export class CarriersTrackingClient implements TrackingClient {
       return response as CarriersResponse;
 
     } catch (error) {
-      this.logger.error('Erro na consulta à API Carriers', {
+      this.logger.error(`❌ Erro na consulta à API Carriers para ${trackingCode}`, {
         trackingCode,
         error: error instanceof Error ? error.message : String(error),
         errorType: error instanceof Error ? error.constructor.name : 'UnknownError'
@@ -56,6 +58,7 @@ export class CarriersTrackingClient implements TrackingClient {
       }
 
       if (error instanceof Error && 'response' in error && (error as any).response?.status === 404) {
+        this.logger.warn(`⚠️ Código ${trackingCode} não encontrado na API Carriers`);
         throw new TrackingNotFoundError(`Código ${trackingCode} não encontrado na Carriers`);
       }
 

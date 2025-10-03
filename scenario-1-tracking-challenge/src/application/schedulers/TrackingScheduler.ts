@@ -73,19 +73,49 @@ export class TrackingScheduler {
   }
 
   private async processPendingTrackingCodes(): Promise<void> {
-    const pendingCodes = await this.trackingRepository.findPendingCodes(
+    this.logger.debug('🔍 Iniciando processamento de todos os códigos', {
+      batchSize: this.config.batchSize,
+      timestamp: new Date().toISOString()
+    });
+
+    // Buscar TODOS os códigos (sem filtro de isActive)
+    const allCodes = await this.trackingRepository.findAllCodes(
       this.config.batchSize
     );
 
-    if (pendingCodes.length === 0) {
-      this.logger.debug('Nenhum código pendente para verificação');
+    this.logger.debug('📋 Resultado da busca por todos os códigos', {
+      totalFound: allCodes.length,
+      codes: allCodes.map(code => ({
+        code: code.code,
+        carrier: code.carrier,
+        status: code.status,
+        lastCheckedAt: code.lastCheckedAt
+      }))
+    });
+
+    if (allCodes.length === 0) {
+      this.logger.debug('❌ Nenhum código encontrado no banco', {
+        currentTime: new Date().toISOString(),
+        batchSize: this.config.batchSize
+      });
       return;
     }
 
-    this.logger.info(`Processando ${pendingCodes.length} códigos de rastreamento`);
+    this.logger.info(`✅ Processando ${allCodes.length} códigos de rastreamento`, {
+      codes: allCodes.map(code => code.code),
+      carriers: [...new Set(allCodes.map(code => code.carrier))]
+    });
 
     // Agrupar por transportadora para otimizar rate limits
-    const codesByCarrier = this.groupByCarrier(pendingCodes);
+    const codesByCarrier = this.groupByCarrier(allCodes);
+
+    this.logger.debug('🚚 Agrupamento por transportadora', {
+      groups: Array.from(codesByCarrier.entries()).map(([carrier, codes]) => ({
+        carrier,
+        count: codes.length,
+        codes: codes.map(c => c.code)
+      }))
+    });
 
     for (const [carrier, codes] of codesByCarrier) {
       await this.processCarrierBatch(carrier, codes);
@@ -112,35 +142,29 @@ export class TrackingScheduler {
   }
 
   private async processCarrierBatch(carrier: string, codes: TrackingCode[]): Promise<void> {
-    const maxConcurrency = this.getMaxConcurrencyForCarrier(carrier);
-    
-    this.logger.debug(`Processando lote da ${carrier}`, {
-      codesCount: codes.length,
-      maxConcurrency
+    this.logger.info(`🚚 Processando ${codes.length} códigos da ${carrier}`, {
+      codes: codes.map(c => c.code)
     });
 
-    // Processar em lotes com limite de concorrência
-    for (let i = 0; i < codes.length; i += maxConcurrency) {
-      const batch = codes.slice(i, i + maxConcurrency);
+    // Processar cada código individualmente (um por vez)
+    for (let i = 0; i < codes.length; i++) {
+      const code = codes[i];
       
-      const results = await Promise.allSettled(
-        batch.map(code => this.processTrackingCode(code))
-      );
-
-      // Log de resultados
-      const successful = results.filter(r => r.status === 'fulfilled').length;
-      const failed = results.filter(r => r.status === 'rejected').length;
-
-      this.logger.debug(`Lote processado`, {
-        carrier,
-        successful,
-        failed,
-        total: batch.length
-      });
-
-      // Pausa entre lotes
-      if (i + maxConcurrency < codes.length) {
-        await this.sleep(500);
+      try {
+        this.logger.info(`📦 Processando código ${i + 1}/${codes.length}: ${code.code}`);
+        await this.processTrackingCode(code);
+        
+        this.logger.info(`✅ Código ${code.code} processado com sucesso`);
+        
+      } catch (error) {
+        this.logger.error(`❌ Erro ao processar código ${code.code}`, {
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+      
+      // Pausa entre cada código para não sobrecarregar a API
+      if (i < codes.length - 1) {
+        await this.sleep(2000); // 2 segundos entre cada código
       }
     }
   }
@@ -166,15 +190,6 @@ export class TrackingScheduler {
     }
   }
 
-  private getMaxConcurrencyForCarrier(carrier: string): number {
-    const limits: Record<string, number> = {
-      'Carriers': 5,   // 5 requests paralelos
-      'Correios': 3,   // 3 requests paralelos
-      'default': 2     // 2 requests paralelos para outros
-    };
-
-    return limits[carrier] || limits.default;
-  }
 
   private async cleanupOldEvents(): Promise<void> {
     this.logger.info('Iniciando limpeza de eventos antigos');

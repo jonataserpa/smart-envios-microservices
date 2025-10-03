@@ -36,7 +36,7 @@ const mockTrackingData = {
   'SM82886187440BM': {
     code: 'SM82886187440BM',
     carrier: 'Carriers',
-    status: 'Em trânsito', //'Entregue', 
+    status: 'Entregue', //'Em trânsito', 
     events: [
       {
         date: '2025-01-20T10:30:00Z',
@@ -50,12 +50,12 @@ const mockTrackingData = {
         location: 'São Paulo, SP',
         description: 'Objeto em trânsito para destino'
       },
-      // {
-      //   date: '2025-01-21T15:00:00Z',
-      //   status: 'Entregue',
-      //   location: 'Silvianopolis, MG',
-      //   description: 'Chegou em Silvianopolis, MG'
-      // }
+      {
+        date: '2025-01-21T15:00:00Z',
+        status: 'Entregue',
+        location: 'Silvianopolis, MG',
+        description: 'Chegou em Silvianopolis, MG'
+      }
     ]
   },
   'SM82886187441BM': {

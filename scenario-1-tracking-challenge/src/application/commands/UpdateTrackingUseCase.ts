@@ -22,20 +22,38 @@ export class UpdateTrackingUseCase {
   ) {}
 
   async execute(trackingCode: string): Promise<TrackingEvent[]> {
-    const tracking = await this.trackingRepository.findByCode(trackingCode);
-    if (!tracking || !tracking.isActive) {
-      throw new TrackingNotFoundError(`Código ${trackingCode} não encontrado ou inativo`);
+    let tracking = await this.trackingRepository.findByCode(trackingCode);
+    
+    // Se não existe no banco, criar um novo registro
+    if (!tracking) {
+      this.logger.info(`🆕 Código ${trackingCode} não encontrado no banco, criando novo registro`);
+      
+      // Criar um novo TrackingCode básico
+      const TrackingCode = require('@domain/entities/TrackingCode').TrackingCode;
+      const newTracking = TrackingCode.create({
+        code: trackingCode,
+        carrier: 'Carriers', // Assumir Carriers por padrão
+        metadata: {}
+      });
+      
+      // Salvar no banco
+      tracking = await this.trackingRepository.save(newTracking);
+      this.logger.info(`✅ Novo código ${trackingCode} criado no banco`);
     }
 
     try {
-      // Verificar rate limiting
-      await this.checkRateLimit(trackingCode);
+      this.logger.info(`🔍 Consultando API Carriers para código: ${trackingCode}`);
 
       // Buscar dados da API Carriers
       const carriersResponse = await this.carriersClient.trackShipment(trackingCode);
       
       // Mapear eventos da resposta
       const newEvents = this.mapCarriersEvents(carriersResponse, trackingCode);
+
+      this.logger.info(`📋 API Carriers retornou ${newEvents.length} eventos para ${trackingCode}`, {
+        currentStatus: tracking.status.value,
+        eventsFound: newEvents.length
+      });
 
       // Processar novos eventos
       const previousStatus = tracking.status;
@@ -48,6 +66,14 @@ export class UpdateTrackingUseCase {
       // Publicar eventos se houve mudanças
       if (newEvents.length > 0) {
         await this.publishTrackingEvents(tracking, newEvents, previousStatus);
+        this.logger.info(`📢 Eventos publicados para ${trackingCode}`, {
+          eventsCount: newEvents.length,
+          statusChanged: previousStatus.value !== tracking.status.value,
+          newStatus: tracking.status.value,
+          previousStatus: previousStatus.value
+        });
+      } else {
+        this.logger.info(`ℹ️ Nenhum evento novo para ${trackingCode} - status mantido: ${tracking.status.value}`);
       }
 
       // Cache da última verificação
@@ -56,11 +82,10 @@ export class UpdateTrackingUseCase {
       // Incrementar métricas de eventos processados
       MetricsController.incrementTrackingEvents(tracking.carrier, tracking.status.value);
 
-      this.logger.info('Rastreamento atualizado com sucesso', {
-        trackingCode,
+      this.logger.info(`✅ ${trackingCode} atualizado com sucesso`, {
         newEvents: newEvents.length,
         currentStatus: tracking.status.value,
-        nextCheck: tracking.nextCheckAt
+        totalEvents: tracking.events.length
       });
 
       return tracking.events;
@@ -75,7 +100,7 @@ export class UpdateTrackingUseCase {
       
       await this.trackingRepository.save(tracking);
 
-      this.logger.error('Erro ao atualizar rastreamento', {
+      this.logger.error('❌ Erro ao atualizar rastreamento', {
         trackingCode,
         error: error instanceof Error ? error.message : String(error),
         errorType: error instanceof Error ? error.constructor.name : 'UnknownError'
@@ -85,14 +110,6 @@ export class UpdateTrackingUseCase {
     }
   }
 
-  private async checkRateLimit(trackingCode: string): Promise<void> {
-    const cacheKey = `rate_limit:${trackingCode}`;
-    const lastCheck = await this.cacheService.get(cacheKey);
-    
-    if (lastCheck && (Date.now() - parseInt(lastCheck) < 300000)) { // 5 min
-      throw new RateLimitError('Rate limit atingido para este código');
-    }
-  }
 
   private mapCarriersEvents(response: any, trackingCode: string): TrackingEvent[] {
     if (!response.events || !Array.isArray(response.events)) {

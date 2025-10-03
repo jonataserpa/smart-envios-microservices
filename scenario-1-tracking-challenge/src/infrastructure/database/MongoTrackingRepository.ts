@@ -138,17 +138,50 @@ export class MongoTrackingRepository implements TrackingRepository {
 
   async findPendingCodes(limit: number = 100): Promise<TrackingCode[]> {
     try {
+      const query = {
+        isActive: true,
+        nextCheckAt: { $lte: new Date() }
+      };
+
       const docs = await this.model
-        .find({
-          isActive: true,
-          nextCheckAt: { $lte: new Date() }
-        })
+        .find(query)
         .limit(limit)
         .sort({ nextCheckAt: 1 });
 
       return docs.map(doc => this.mapToDomain(doc));
     } catch (error) {
       throw new DatabaseError('Erro ao buscar códigos pendentes', error);
+    }
+  }
+
+  async findActiveCodes(limit: number = 100): Promise<TrackingCode[]> {
+    try {
+      const query = {
+        isActive: true
+      };
+
+      const docs = await this.model
+        .find(query)
+        .limit(limit)
+        .sort({ lastCheckedAt: 1 }); // Ordenar por última verificação (mais antigos primeiro)
+
+      return docs.map(doc => this.mapToDomain(doc));
+    } catch (error) {
+      throw new DatabaseError('Erro ao buscar códigos ativos', error);
+    }
+  }
+
+  async findAllCodes(limit: number = 100): Promise<TrackingCode[]> {
+    try {
+      // Buscar TODOS os códigos (sem filtro algum)
+      const docs = await this.model
+        .find({})
+        .limit(limit)
+        .sort({ lastCheckedAt: 1 }); // Ordenar por última verificação (mais antigos primeiro)
+
+      return docs.map(doc => this.mapToDomain(doc));
+    } catch (error) {
+      throw new DatabaseError('Erro ao buscar todos os códigos', error);
     }
   }
 
@@ -257,6 +290,23 @@ export class MongoTrackingRepository implements TrackingRepository {
       return await this.model.countDocuments({ status });
     } catch (error) {
       throw new DatabaseError('Erro ao contar códigos por status', error);
+    }
+  }
+
+  async recalculateNextCheck(code: string): Promise<TrackingCode> {
+    try {
+      const tracking = await this.findByCode(code);
+      if (!tracking) {
+        throw new DatabaseError(`Código de rastreamento ${code} não encontrado`);
+      }
+
+      // Recalcular próxima verificação
+      tracking.recalculateNextCheck();
+
+      // Salvar as mudanças
+      return await this.save(tracking);
+    } catch (error) {
+      throw new DatabaseError('Erro ao recalcular próxima verificação', error);
     }
   }
 

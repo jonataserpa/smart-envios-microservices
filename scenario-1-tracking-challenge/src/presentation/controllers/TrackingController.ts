@@ -132,6 +132,7 @@ export class TrackingController {
     }
   }
 
+
   private handleError(res: Response, error: any, message: string): void {
     this.logger.error(message, {
       error: error.message,

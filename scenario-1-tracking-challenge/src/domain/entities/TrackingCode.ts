@@ -65,10 +65,7 @@ export class TrackingCode {
     // Atualizar próxima verificação
     this.updateNextCheck();
     
-    // Verificar se deve desativar
-    if (this.shouldDeactivate()) {
-      this._isActive = false;
-    }
+    // NÃO desativar automaticamente - manter sempre ativo para novas consultas
   }
 
   updateLastCheck(): void {
@@ -88,6 +85,12 @@ export class TrackingCode {
   reactivate(): void {
     this._isActive = true;
     this._status = TrackingStatus.PENDING;
+    this.updateNextCheck();
+  }
+
+  recalculateNextCheck(): void {
+    // Recalcular próxima verificação baseado no status atual
+    // Útil quando o status é alterado manualmente no banco
     this.updateNextCheck();
   }
 
@@ -115,13 +118,9 @@ export class TrackingCode {
       this._metadata.errorCount
     );
     
-    if (interval === 0) {
-      this._isActive = false;
-      return;
-    }
-    
-    this._nextCheckAt = new Date(Date.now() + interval * 1000);
-    this._checkInterval = interval;
+    // Sempre manter ativo - não desativar baseado no intervalo
+    this._nextCheckAt = new Date(Date.now() + (interval || 1800) * 1000); // 30 min default
+    this._checkInterval = interval || 1800;
   }
 
   private shouldDeactivate(): boolean {
